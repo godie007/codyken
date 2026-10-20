@@ -19,7 +19,7 @@ Archivo: `~/Library/Application Support/codyken/settings.json` (carpeta `userDat
 
 | Clave | Por defecto | Qué guarda |
 |---|---|---|
-| `recent` | `[]` | Últimos 15 repos abiertos |
+| `recent` | `[]` | Hasta 50 repos abiertos, el más reciente primero; se depura desde [[04 - Interfaz/Repositorios Recientes]]. Lo escriben solo `addRecent` / `removeRecent` en el main |
 | `tabs` / `activeTab` | `[]` / `0` | Pestañas abiertas; se restauran al iniciar |
 | `pullMode` | `merge` | Modo del botón Pull (`merge`, `ff-only`, `rebase`) |
 | `columns` | `refs, graph, message, author, date` | Columnas visibles del gráfico (`sha` está oculta) |

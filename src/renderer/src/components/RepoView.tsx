@@ -12,6 +12,7 @@ import { BlameView, FileHistory } from './FileTools'
 import { GraphView } from './GraphView'
 import { Icon } from './Icons'
 import { LeftPanel } from './LeftPanel'
+import { RepoSwitcher } from './RepoList'
 import { Toolbar } from './Toolbar'
 import { Resizer, usePrompt, useToast } from './ui'
 
@@ -40,9 +41,12 @@ export interface RepoViewProps {
   onSettings: (patch: Partial<Settings>) => void
   onOpenRepo: (path?: string) => void
   onNewTab: () => void
+  /** Repos con pestaña abierta, para marcarlos en la lista de recientes */
+  openRepos: string[]
+  onRemoveRecent: (paths: string[]) => void
 }
 
-export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab }: RepoViewProps) {
+export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, openRepos, onRemoveRecent }: RepoViewProps) {
   const filter = settings.graphFilters[repo] ?? NO_FILTER
   const { data, refreshAll, refreshStatus, loadMore } = useRepoData(repo, filter)
   const { toast } = useToast()
@@ -52,6 +56,8 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab }: R
   const [busy, setBusy] = useState<string | null>(null)
   const busyRef = useRef<string | null>(null)
   const [palette, setPalette] = useState(false)
+  const [repoMenu, setRepoMenu] = useState(false)
+  const closeRepoMenu = useCallback(() => setRepoMenu(false), [])
   const [scrollTarget, setScrollTarget] = useState<{ hash: string; nonce: number } | null>(null)
   const [searchFocus, setSearchFocus] = useState(0)
   const [filterFocus, setFilterFocus] = useState(0)
@@ -736,6 +742,9 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab }: R
     const typing = e.target instanceof Element && !!e.target.closest('input, textarea, select, [contenteditable="true"]')
     const cmd = e.metaKey || e.ctrlKey
     const key = e.key.toLowerCase()
+    if (cmd && e.shiftKey && key === 'o') return e.preventDefault(), setRepoMenu((open) => !open)
+    // Con el desplegable de repos abierto, sus teclas son suyas
+    if (repoMenu) return
     if (cmd && !e.shiftKey && key === 'p') return e.preventDefault(), setPalette(true)
     if (cmd && !e.shiftKey && !e.altKey && key === 'f') return e.preventDefault(), setDiff(null), setSearchFocus((n) => n + 1)
     if (cmd && e.altKey && key === 'f') return e.preventDefault(), onSettings({ leftVisible: true }), setFilterFocus((n) => n + 1)
@@ -787,6 +796,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab }: R
       { id: 'finder', group: 'Repositorio', label: 'Abrir carpeta', icon: <Icon.Folder size={14} />, run: () => void api.openInFinder(repo) },
       { id: 'copy-path', group: 'Repositorio', label: 'Copiar ruta del repositorio', icon: <Icon.Copy size={14} />, run: () => copy(repo, 'Ruta') },
       { id: 'open', group: 'Pestañas', label: 'Abrir repositorio…', icon: <Icon.Folder size={14} />, run: () => onOpenRepo() },
+      { id: 'repos', group: 'Pestañas', label: 'Repositorios recientes…', hint: `⇧${mod}O`, icon: <Icon.Folder size={14} />, run: () => setRepoMenu(true) },
       { id: 'new-tab', group: 'Pestañas', label: 'Nueva pestaña', hint: `${mod}T`, icon: <Icon.Plus size={14} />, run: onNewTab }
     ]
     for (const ref of refs) {
@@ -831,6 +841,21 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab }: R
         leftVisible={settings.leftVisible}
         rightVisible={settings.rightVisible}
         undoLabel={undoStack[undoStack.length - 1]?.label ?? null}
+        repoMenu={
+          repoMenu && (
+            <RepoSwitcher
+              recent={settings.recent}
+              openRepos={openRepos}
+              current={repo}
+              onOpen={(path) => path !== repo && onOpenRepo(path)}
+              onRemove={onRemoveRecent}
+              onClose={closeRepoMenu}
+              onOpenDialog={() => onOpenRepo()}
+              onNewTab={onNewTab}
+            />
+          )
+        }
+        onRepoMenu={() => setRepoMenu((open) => !open)}
         onUndo={() => void undoLast()}
         onPull={pull}
         onFetch={() => fetchAll()}

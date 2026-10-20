@@ -18,7 +18,7 @@ related:
 
 | Función | Comando de git | Resultado |
 |---|---|---|
-| `resolveRepo(path)` | `rev-parse --show-toplevel` | Raíz del repo; error si la carpeta no existe o no es repo |
+| `resolveRepo(path)` | `rev-parse --show-toplevel` | Raíz del repo; error si la carpeta no existe o no es repo. El handler IPC lo añade a recientes salvo con `addToRecent = false` |
 | `initRepo(path)` / `cloneRepo(url, dir)` | `init` / `clone -- url dest` | Raíz del repo nuevo (la carpeta destino no debe existir) |
 | `getLog(repo, limit, filtro)` | `log --date-order -n N --format=… <revs> --` | `Commit[]` ([[#Log y orden]]) |
 | `getRefs` | `for-each-ref refs/heads refs/remotes refs/tags` | `Ref[]` con upstream, ↑/↓, `gone`, HEAD; descarta symrefs (`origin/HEAD`) y en tags usa el commit apuntado |

@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { api, mod } from '../api'
-import { homeRelative, repoName } from '../lib/format'
 import { Icon, Logo } from './Icons'
+import { RepoList } from './RepoList'
 import { useToast } from './ui'
 
 export interface WelcomeProps {
   recent: string[]
+  openRepos: string[]
   onOpen: (path?: string) => void
-  onRemoveRecent: (path: string) => void
+  onRemoveRecent: (paths: string[]) => void
 }
 
-export function Welcome({ recent, onOpen, onRemoveRecent }: WelcomeProps) {
+export function Welcome({ recent, openRepos, onOpen, onRemoveRecent }: WelcomeProps) {
   const { toast } = useToast()
   const [cloning, setCloning] = useState(false)
   const [url, setUrl] = useState('')
@@ -91,26 +92,8 @@ export function Welcome({ recent, onOpen, onRemoveRecent }: WelcomeProps) {
           </div>
         )}
 
-        <div className="recent">
-          <div className="recent-title">Recientes</div>
-          {recent.length === 0 && <div className="muted small">Los repositorios que abras aparecerán aquí.</div>}
-          {recent.map((path) => (
-            <div key={path} className="recent-row" onClick={() => onOpen(path)}>
-              <Icon.Branch size={15} />
-              <span className="recent-name">{repoName(path)}</span>
-              <span className="recent-path truncate">{homeRelative(path)}</span>
-              <button
-                className="icon-btn"
-                title="Quitar de recientes"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onRemoveRecent(path)
-                }}
-              >
-                <Icon.Close size={13} />
-              </button>
-            </div>
-          ))}
+        <div className="welcome-recent">
+          <RepoList recent={recent} openRepos={openRepos} onOpen={onOpen} onRemove={onRemoveRecent} />
         </div>
         <div className="welcome-hint muted small">
           <kbd>{mod}T</kbd> nueva pestaña · <kbd>{mod}P</kbd> acciones · <kbd>{mod}F</kbd> buscar commits

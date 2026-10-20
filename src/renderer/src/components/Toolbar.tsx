@@ -20,6 +20,9 @@ export interface ToolbarProps {
   pullMode: PullMode
   leftVisible: boolean
   rightVisible: boolean
+  /** Desplegable de repositorios recientes, si está abierto */
+  repoMenu: ReactNode
+  onRepoMenu: () => void
   onUndo: () => void
   onPull: (mode: PullMode) => void
   onFetch: () => void
@@ -63,7 +66,11 @@ export function Toolbar(props: ToolbarProps) {
           <Icon.Panel size={16} />
         </button>
         <div className="toolbar-repo">
-          <span className="toolbar-repo-name">{repoName(props.repo)}</span>
+          <button className={`repo-select ${props.repoMenu ? 'open' : ''}`} onClick={props.onRepoMenu} title={`Repositorios recientes (⇧${mod}O)`}>
+            <span className="toolbar-repo-name truncate">{repoName(props.repo)}</span>
+            <Icon.ChevronDown size={12} />
+          </button>
+          {props.repoMenu}
           <button className="branch-select" onClick={props.onBranchMenu} title="Cambiar de rama" disabled={disabled}>
             <Icon.Branch size={13} />
             <span className="truncate">{state?.branch ?? (state?.head ? 'HEAD desacoplado' : 'sin commits')}</span>

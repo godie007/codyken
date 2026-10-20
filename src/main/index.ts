@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Api, ApiResult, MenuItemSpec } from '../shared/types'
 import * as gitOps from './git'
-import { addRecent, getSettings, updateSettings } from './settings'
+import { addRecent, getRecentRepos, getSettings, removeRecent, updateSettings } from './settings'
 import { RepoWatchers } from './watcher'
 
 const snapshotPath = !app.isPackaged ? process.env.CODYKEN_SNAPSHOT : undefined
@@ -20,9 +20,9 @@ function repo(path: string): string {
   return path
 }
 
-async function remember(path: string): Promise<string> {
+async function remember(path: string, addToRecent = true): Promise<string> {
   knownRepos.add(path)
-  addRecent(path)
+  if (addToRecent) addRecent(path)
   return path
 }
 
@@ -85,7 +85,9 @@ const handlers: Handlers = {
   watchRepo: async (_w, path) => watchers.watch(repo(path), await gitOps.getGitDir(path)),
   unwatchRepo: (_w, path) => watchers.unwatch(path),
 
-  resolveRepo: async (_w, path) => remember(await gitOps.resolveRepo(path)),
+  resolveRepo: async (_w, path, addToRecent) => remember(await gitOps.resolveRepo(path), addToRecent !== false),
+  getRecentRepos: () => getRecentRepos(),
+  removeRecent: (_w, paths) => removeRecent(Array.isArray(paths) ? paths.filter((p): p is string => typeof p === 'string') : []),
   initRepo: async (_w, path) => remember(await gitOps.initRepo(path)),
   cloneRepo: async (_w, url, parentDir) => remember(await gitOps.cloneRepo(url, parentDir)),
 

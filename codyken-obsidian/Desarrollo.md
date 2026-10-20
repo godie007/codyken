@@ -37,16 +37,18 @@ npm run typecheck  # dos proyectos de TypeScript
 src/main/index.ts        ventana, menús, IPC, diálogos, modo captura
 src/main/git.ts          todas las operaciones de git
 src/main/watcher.ts      vigilancia de archivos
-src/main/settings.ts     ajustes persistentes
+src/main/settings.ts     ajustes persistentes y lista de recientes
 src/preload/index.ts     puente window.codyken
 src/shared/types.ts      tipos y contrato Api
+src/shared/recent.ts     reglas de la lista de recientes (main y tests)
 src/renderer/src/
   App.tsx                pestañas y atajos globales
   api.ts                 Proxy del API
   useRepoData.ts         carga y refresco de datos de un repo
   components/            RepoView (orquestador), Toolbar, LeftPanel, GraphView,
-                         CommitPanel, DiffView, FileTools, CommandPalette, Welcome, ui, Icons
-  lib/                   graph, refs, diff, patch, highlight, format, fuzzy
+                         CommitPanel, DiffView, FileTools, CommandPalette, RepoList,
+                         Welcome, ui, Icons
+  lib/                   graph, refs, diff, patch, highlight, format, fuzzy, repos
   styles.css             tema Monokai
 tests/                   vitest
 codyken-obsidian/        esta bóveda (Adjuntos/capturas: imágenes del README)

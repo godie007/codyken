@@ -1,7 +1,8 @@
 import { app } from 'electron'
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { Settings } from '../shared/types'
+import { pushRecent, withoutRecent } from '../shared/recent'
+import type { RecentRepo, Settings } from '../shared/types'
 
 const DEFAULTS: Settings = {
   recent: [],
@@ -44,6 +45,14 @@ export function updateSettings(patch: Partial<Settings>): Settings {
 }
 
 export function addRecent(repo: string): void {
-  const recent = [repo, ...getSettings().recent.filter((r) => r !== repo)].slice(0, 15)
-  updateSettings({ recent })
+  updateSettings({ recent: pushRecent(getSettings().recent, repo) })
+}
+
+export function removeRecent(paths: string[]): string[] {
+  return updateSettings({ recent: withoutRecent(getSettings().recent, paths) }).recent
+}
+
+/** La lista de recientes con una marca para los repos que ya no están en disco. */
+export function getRecentRepos(): RecentRepo[] {
+  return getSettings().recent.map((path) => ({ path, exists: existsSync(join(path, '.git')) }))
 }

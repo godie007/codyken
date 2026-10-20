@@ -15,7 +15,7 @@ related:
 # 🧪 Suite de Tests
 
 ```bash
-npm test          # vitest run — 22 tests
+npm test          # vitest run — 26 tests
 npm run typecheck # tsc de main/preload/lib/tests y del renderer
 ```
 
@@ -57,6 +57,15 @@ Los tests de git crean repos reales en una carpeta temporal y los borran al term
 | blame atribuye cada línea a su commit | `getBlame` |
 | extrae el servidor del remoto | `getRemotes` |
 | quita el hash de los stashes automáticos y el prefijo de los con nombre | `stashLabel` |
+
+## `tests/recent.test.ts` — [[04 - Interfaz/Repositorios Recientes|repositorios recientes]]
+
+| Test | Verifica |
+|---|---|
+| al abrir un repo lo sube al principio sin duplicarlo | `pushRecent` |
+| recorta al máximo de recientes | `MAX_RECENT` |
+| quitar elementos conserva el orden del resto | `withoutRecent` |
+| sin búsqueda mantiene el orden; con búsqueda prioriza el nombre y acepta la ruta | `matchRepos` |
 
 ## Sin cobertura automática
 

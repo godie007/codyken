@@ -51,7 +51,8 @@ function Shell() {
       for (const path of loaded.tabs) {
         if (!path) continue
         try {
-          valid.push(await api.resolveRepo(path))
+          // Restaurar pestañas no reordena ni devuelve a la lista los repos que el usuario quitó
+          valid.push(await api.resolveRepo(path, false))
         } catch {
           // El repo se movió o se borró: se omite la pestaña
         }
@@ -70,6 +71,15 @@ function Shell() {
 
   const refreshRecent = (): void => {
     void api.getSettings().then((s) => setSettings((cur) => (cur ? { ...cur, recent: s.recent } : cur)))
+  }
+
+  const removeRecent = async (paths: string[]): Promise<void> => {
+    try {
+      const recent = await api.removeRecent(paths)
+      setSettings((cur) => (cur ? { ...cur, recent } : cur))
+    } catch (e) {
+      toast('error', 'No se pudo actualizar la lista', e instanceof Error ? e.message : String(e))
+    }
   }
 
   const openRepo = async (path?: string): Promise<void> => {
@@ -137,6 +147,7 @@ function Shell() {
 
   if (!settings || !tabs.length) return <div className="app-loading"><Logo size={40} /></div>
   const current = tabs[active]
+  const openRepos = tabs.flatMap((t) => (t.path ? [t.path] : []))
 
   return (
     <div className="app">
@@ -171,12 +182,22 @@ function Shell() {
       </div>
       <div className="app-body">
         {current.path ? (
-          <RepoView key={current.id + current.path} repo={current.path} settings={settings} onSettings={updateSettings} onOpenRepo={(p) => void openRepo(p)} onNewTab={addTab} />
+          <RepoView
+            key={current.id + current.path}
+            repo={current.path}
+            settings={settings}
+            onSettings={updateSettings}
+            onOpenRepo={(p) => void openRepo(p)}
+            onNewTab={addTab}
+            openRepos={openRepos}
+            onRemoveRecent={(paths) => void removeRecent(paths)}
+          />
         ) : (
           <Welcome
             recent={settings.recent}
+            openRepos={openRepos}
             onOpen={(p) => void openRepo(p)}
-            onRemoveRecent={(p) => updateSettings({ recent: settings.recent.filter((r) => r !== p) })}
+            onRemoveRecent={(paths) => void removeRecent(paths)}
           />
         )}
       </div>

@@ -10,7 +10,15 @@ up: "[[00 - Inicio]]"
 
 # 📝 Historial de Cambios
 
-## 2026-10-20 — v0.1.0 (commit `177f36f`, publicado en GitHub)
+## 2026-10-20 — Repositorios recientes
+
+- La lista de repos abiertos pasa de 15 a **50** y ahora se abre desde cualquier pestaña: clic en el nombre del repo o **⇧⌘O** ([[04 - Interfaz/Repositorios Recientes]]).
+- Búsqueda por nombre o ruta, navegación con teclado y etiquetas *actual*, *en pestaña* y *no encontrado*.
+- Quitar elementos con ✕ o clic derecho, **Quitar no encontrados** y **Vaciar** (con confirmación).
+- Restaurar pestañas al iniciar ya no devuelve a la lista los repos que quitaste.
+- La lista la escribe solo el proceso principal (`removeRecent`); antes, quitar un reciente justo al abrir otro repo podía perder el recién abierto.
+
+## 2026-10-20 — v0.1.0 (commit `7ed9a5f`, publicado en GitHub)
 
 ### Base
 - Cliente Electron + React + TypeScript con pestañas, barra de acciones, paneles y barra de estado.

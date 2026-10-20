@@ -120,6 +120,12 @@ export type CheckoutTarget =
   | { kind: 'remote'; name: string }
   | { kind: 'commit'; hash: string }
 
+export interface RecentRepo {
+  path: string
+  /** false si la carpeta se movió o se borró */
+  exists: boolean
+}
+
 export interface Settings {
   recent: string[]
   tabs: (string | null)[]
@@ -171,7 +177,10 @@ export interface Api {
   watchRepo(repo: string): Promise<void>
   unwatchRepo(repo: string): Promise<void>
 
-  resolveRepo(path: string): Promise<string>
+  /** Valida la carpeta y la registra como abierta; con addToRecent=false no la sube en la lista de recientes. */
+  resolveRepo(path: string, addToRecent?: boolean): Promise<string>
+  getRecentRepos(): Promise<RecentRepo[]>
+  removeRecent(paths: string[]): Promise<string[]>
   initRepo(path: string): Promise<string>
   cloneRepo(url: string, parentDir: string): Promise<string>
 

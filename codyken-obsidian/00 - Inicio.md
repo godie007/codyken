@@ -61,6 +61,7 @@ aliases:
 ## 🎨 04 — Interfaz
 
 - [[04 - Interfaz/Distribución de la Ventana|Distribución de la ventana]]
+- [[04 - Interfaz/Repositorios Recientes|Repositorios recientes]]
 - [[04 - Interfaz/Gráfico de Commits|Gráfico de commits]]
 - [[04 - Interfaz/Panel Izquierdo|Panel izquierdo]]
 - [[04 - Interfaz/Panel Derecho|Panel derecho]]

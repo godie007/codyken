@@ -7,7 +7,7 @@ tags:
   - grafico
 updated: 2026-10-20
 up: "[[00 - Inicio]]"
-prev: "[[04 - Interfaz/Distribución de la Ventana]]"
+prev: "[[04 - Interfaz/Repositorios Recientes]]"
 next: "[[04 - Interfaz/Panel Izquierdo]]"
 related:
   - "[[03 - Algoritmos/Gráfico de Carriles]]"

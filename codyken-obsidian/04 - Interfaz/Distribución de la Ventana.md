@@ -6,7 +6,7 @@ tags:
   - interfaz
 updated: 2026-10-20
 up: "[[00 - Inicio]]"
-next: "[[04 - Interfaz/Gráfico de Commits]]"
+next: "[[04 - Interfaz/Repositorios Recientes]]"
 related:
   - "[[01 - Arquitectura/Visión General]]"
 ---
@@ -31,7 +31,8 @@ Los paneles laterales se redimensionan arrastrando el borde y se ocultan con ⌘
 | Botón | Acción | Notas |
 |---|---|---|
 | ☰ (izquierda) | Mostrar/ocultar panel izquierdo | ⌘J |
-| Nombre del repo + rama ▾ | Menú para cambiar de rama o crear una | |
+| Nombre del repo ▾ | [[04 - Interfaz/Repositorios Recientes\|Repositorios recientes]]: abrir otro repo o quitarlo de la lista | ⇧⌘O |
+| Rama ▾ (debajo del nombre) | Menú para cambiar de rama o crear una | |
 | **Deshacer** | [[03 - Algoritmos/Pila de Deshacer\|Deshace la última acción]] | Tooltip "Deshacer: …"; ⌘Z |
 | **Fetch** | `fetch --all --prune` | ⌘L |
 | **Pull** ▾ | Pull en el modo predeterminado; la flecha abre fetch, los tres modos y el modo predeterminado | Globo con commits por bajar |
@@ -46,7 +47,7 @@ Los paneles laterales se redimensionan arrastrando el borde y se ocultan con ⌘
 
 ## Bienvenida
 
-Sin repo abierto se muestra `Welcome.tsx`: **Abrir repositorio**, **Clonar** (URL HTTPS o SSH y carpeta destino), **Crear repositorio** (`git init`) y la lista de **Recientes** (con botón para quitar).
+Sin repo abierto se muestra `Welcome.tsx`: **Abrir repositorio**, **Clonar** (URL HTTPS o SSH y carpeta destino), **Crear repositorio** (`git init`) y la lista de [[04 - Interfaz/Repositorios Recientes|repositorios recientes]] con búsqueda y botones para quitar.
 
 ## Avisos
 

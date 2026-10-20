@@ -36,4 +36,5 @@ Además conviene probar con un **repo real grande** (cientos de ramas de desplie
 - [ ] Commit → Deshacer → los cambios vuelven a preparados y el mensaje a la caja.
 - [ ] Historial sigue renombres; Blame resalta el commit al pasar el ratón.
 - [ ] ⌘P filtra acciones; Fetch actualiza los globos de Pull/Push.
+- [ ] ⇧⌘O abre los recientes: buscar + Enter abre el repo; ✕ y *Quitar no encontrados* lo quitan de la lista y de `settings.json`; la bienvenida muestra la misma lista.
 - [ ] Merge con conflicto → aviso con Abortar/Continuar → resolver → Continuar crea el merge.

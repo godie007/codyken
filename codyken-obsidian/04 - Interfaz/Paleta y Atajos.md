@@ -28,7 +28,7 @@ Búsqueda aproximada (`lib/fuzzy.ts`) sobre:
 | Ver | Buscar commits, Paneles izquierdo/derecho, Mostrar todas las ramas (si hay filtro) |
 | Checkout | Cada rama local (no la actual) y remota |
 | Ir a | Cada rama: selecciona su commit en el gráfico |
-| Abrir / Pestañas | Repos recientes, Abrir repositorio…, Nueva pestaña |
+| Abrir / Pestañas | Repos recientes, Abrir repositorio…, Repositorios recientes… (desplegable), Nueva pestaña |
 
 ↑/↓ para moverse, Enter para ejecutar, Esc para cerrar.
 
@@ -50,6 +50,7 @@ Búsqueda aproximada (`lib/fuzzy.ts`) sobre:
 | Preparar / quitar el archivo abierto | S / U |
 | Cerrar diff, historial o blame | Esc |
 | Abrir repo · nueva pestaña · cerrar pestaña | ⌘O · ⌘T · ⌘W |
+| [[04 - Interfaz/Repositorios Recientes\|Repositorios recientes]] | ⇧⌘O |
 | Ir a la pestaña N · siguiente | ⌘1 … ⌘9 · Ctrl+Tab |
 | Zoom | ⌘+ / ⌘− / ⌘0 |
 
