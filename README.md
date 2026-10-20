@@ -2,9 +2,13 @@
 
 Cliente Git de escritorio hecho con Electron, React y TypeScript, con tema oscuro Monokai. Usa el `git` instalado en el equipo; no reimplementa Git.
 
-![Vista principal de Codyken: ramas a la izquierda, gráfico de commits al centro y cambios pendientes a la derecha](docs/capturas/principal.png)
+![Vista principal de Codyken: ramas a la izquierda, gráfico de commits al centro y cambios pendientes a la derecha](codyken-obsidian/Adjuntos/capturas/principal.png)
 
 > Las capturas usan un repositorio de demostración (`main`, `feature/login`, `feature/pagos`, `hotfix/titulo`, una etiqueta y un stash).
+
+## Documentación
+
+La documentación completa (arquitectura, capa git, algoritmos del gráfico, interfaz, flujos de trabajo, tests y decisiones) está en la bóveda de Obsidian [`codyken-obsidian/`](codyken-obsidian/00%20-%20Inicio.md): ábrela en Obsidian con *Abrir carpeta como bóveda* y empieza por `00 - Inicio`.
 
 ## Uso
 
@@ -45,13 +49,13 @@ Requiere Node 22 o superior y `git` en el PATH.
 
 Cada stash es un nodo cuadrado punteado colgado del commit donde se guardó. Al seleccionarlo, el panel derecho muestra sus archivos (incluidos los nuevos guardados con `-u`) y los botones **Aplicar y eliminar (pop)**, **Aplicar** y **Eliminar**. Clic derecho abre el mismo menú.
 
-![Stash seleccionado en el gráfico con su archivo y las acciones de aplicar o eliminar](docs/capturas/stash.png)
+![Stash seleccionado en el gráfico con su archivo y las acciones de aplicar o eliminar](codyken-obsidian/Adjuntos/capturas/stash.png)
 
 ### Ocultar ramas
 
 El ojo junto a cada rama, carpeta o remoto la quita del gráfico; una rama local se oculta junto con su remota para que sus commits desaparezcan de verdad. Desde el clic derecho también está **Mostrar solo esta rama**. El filtro se guarda por repositorio y se avisa en la búsqueda (“Ramas filtradas”), en el panel y en la barra de estado.
 
-![feature/pagos oculta: sus commits ya no aparecen y el panel avisa "2 ramas ocultas"](docs/capturas/ocultar-ramas.png)
+![feature/pagos oculta: sus commits ya no aparecen y el panel avisa "2 ramas ocultas"](codyken-obsidian/Adjuntos/capturas/ocultar-ramas.png)
 
 ## Panel izquierdo
 
@@ -67,7 +71,7 @@ El ojo junto a cada rama, carpeta o remoto la quita del gráfico; una rama local
 - Diff con **resaltado de sintaxis Monokai**, resaltado dentro de la línea y tres modos: Bloques, Archivo completo y Dividido.
 - Resumen + descripción con contador de 72 caracteres y opción de **amend**.
 
-![Diff de app.js con resaltado de sintaxis y dos líneas seleccionadas para preparar](docs/capturas/cambios.png)
+![Diff de app.js con resaltado de sintaxis y dos líneas seleccionadas para preparar](codyken-obsidian/Adjuntos/capturas/cambios.png)
 
 ## Historial y blame de un archivo
 
@@ -76,9 +80,9 @@ Desde los botones **Historial** y **Blame** del diff, o con clic derecho sobre u
 - **Historial**: todos los commits que tocaron el archivo, siguiendo renombres, con el diff de cada uno al lado. Doble clic lleva al commit en el gráfico.
 - **Blame**: cada línea con el commit, autor y fecha que la introdujo, agrupadas por commit y coloreadas; las líneas sin confirmar se marcan aparte. Clic en el bloque abre ese commit.
 
-![Historial de README.md con sus tres commits y el diff del seleccionado](docs/capturas/historial.png)
+![Historial de README.md con sus tres commits y el diff del seleccionado](codyken-obsidian/Adjuntos/capturas/historial.png)
 
-![Blame de README.md: cada línea con el commit que la introdujo](docs/capturas/blame.png)
+![Blame de README.md: cada línea con el commit que la introdujo](codyken-obsidian/Adjuntos/capturas/blame.png)
 
 ## Deshacer
 
@@ -100,7 +104,7 @@ Botón **Deshacer** (y ⌘Z) para commit, amend, checkout, crear/eliminar/renomb
 
 ⌘P abre una búsqueda aproximada sobre todas las acciones, el checkout de cualquier rama, saltar a una rama en el gráfico y abrir repositorios recientes.
 
-![Paleta de comandos filtrando por "pull"](docs/capturas/paleta.png)
+![Paleta de comandos filtrando por "pull"](codyken-obsidian/Adjuntos/capturas/paleta.png)
 
 ## Atajos
 
@@ -130,7 +134,7 @@ src/preload/    puente seguro (contextIsolation + sandbox)
 src/shared/     tipos y contrato de la API
 src/renderer/   React: components/ (vistas) y lib/ (gráfico, diff, parches, resaltado, búsqueda)
 tests/          vitest
-docs/capturas/  imágenes de este README
+codyken-obsidian/  documentación completa (bóveda de Obsidian); Adjuntos/capturas/ tiene las imágenes de este README
 ```
 
 Seguridad: el renderer no tiene acceso a Node; solo llama a métodos de una lista cerrada. Git se ejecuta sin shell (argumentos en arreglo), sin pedir credenciales por terminal (`GIT_TERMINAL_PROMPT=0`, SSH en modo batch) y solo sobre repos que abriste.
