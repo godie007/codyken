@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Commit, DiffSource, FileChange, GraphFilter, MenuItemSpec, PullMode, Ref, RepoState, ResetMode, Settings, StashEntry } from '../../../shared/types'
+import type { Commit, DiffSource, FetchResult, FileChange, GraphFilter, MenuItemSpec, PullMode, PullRequest, PullRequestInfo, RebaseMode, RebaseStep, Ref, RepoState, ResetMode, Settings, StashEntry, Worktree } from '../../../shared/types'
 import { api, mod } from '../api'
 import { homeRelative, relativeTime, repoName, shortHash } from '../lib/format'
 import { computeGraph, WIP_HASH } from '../lib/graph'
+import { planDrop, dropTargetRef, type DropAction, type DropTarget } from '../lib/drop'
 import { labelsByCommit, type RefLabel } from '../lib/refs'
 import { useRepoData } from '../useRepoData'
 import { CommandPalette, type PaletteItem } from './CommandPalette'
-import { CommitPanel, type CommitDraft, type CommitPanelActions, type Selection } from './CommitPanel'
+import { CommitPanel, type CommitDraft, type CommitPanelActions, type CompareEnd, type Selection } from './CommitPanel'
 import { DiffView } from './DiffView'
 import { BlameView, FileHistory } from './FileTools'
 import { GraphView } from './GraphView'
 import { Icon } from './Icons'
 import { LeftPanel } from './LeftPanel'
+import { MergeEditor } from './MergeEditor'
+import { RebaseDialog } from './RebaseDialog'
 import { RepoSwitcher } from './RepoList'
 import { Toolbar } from './Toolbar'
 import { Resizer, usePrompt, useToast } from './ui'
@@ -23,7 +26,10 @@ const clamp = (value: number, min: number, max: number): number => Math.min(max,
 const NO_FILTER: GraphFilter = { hidden: [], solo: [] }
 const UNDO_LIMIT = 20
 
-/** Una acción que se puede deshacer, válida solo mientras HEAD siga donde la dejó. */
+/**
+ * Una acción que se puede deshacer y rehacer. En la pila de deshacer, head/branch son el estado que dejó la acción;
+ * en la de rehacer, el que dejó el deshacer. Solo es válida mientras el repo siga en ese estado.
+ */
 interface UndoEntry {
   label: string
   head: string | null
@@ -31,6 +37,19 @@ interface UndoEntry {
   /** El deshacer usa reset --hard: exige no tener cambios sin confirmar */
   hard: boolean
   undo: () => Promise<unknown>
+  redo: (() => Promise<unknown>) | null
+  redoHard: boolean
+}
+
+/** Cómo deshacer una operación que movió HEAD; `mode` es el reset que se usará también al rehacer. */
+interface UndoPlan {
+  undo: () => Promise<unknown>
+  hard?: boolean
+  mode?: ResetMode
+  /** Rehacer a medida (por defecto vuelve a dejar la rama donde la dejó la operación) */
+  redo?: () => Promise<unknown>
+  /** Se llama después del rehacer genérico */
+  onRedo?: () => void
 }
 
 type FileTool = { kind: 'history' | 'blame'; path: string; rev: string | null }
@@ -67,6 +86,11 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
   const [highlight, setHighlight] = useState<string | null>(null)
   const [fileTool, setFileTool] = useState<FileTool | null>(null)
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
+  const [redoStack, setRedoStack] = useState<UndoEntry[]>([])
+  /** Rebase interactivo abierto: desde un commit de la rama actual, o de `tip` sobre otra rama */
+  const [rebasePlan, setRebasePlan] = useState<{ base: string; mode: RebaseMode; tip?: string; baseName?: string } | null>(null)
+  const [prs, setPrs] = useState<PullRequestInfo | null>(null)
+  const [prsLoading, setPrsLoading] = useState(false)
 
   const { commits, refs, state, status, stashes } = data
   const head = state?.head ?? null
@@ -97,7 +121,8 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     () => computeGraph(hasWip ? [{ hash: WIP_HASH, parents: head ? [head] : [] }, ...graphCommits] : graphCommits, hasWip ? WIP_HASH : head),
     [graphCommits, hasWip, head]
   )
-  const selectedHash = selection?.kind === 'wip' ? WIP_HASH : selection ? selection.hash : null
+  const selectedHash = selection?.kind === 'wip' ? WIP_HASH : selection?.kind === 'compare' ? selection.target.hash : selection ? selection.hash : null
+  const compareBase = selection?.kind === 'compare' ? selection.base.hash : null
 
   const setDraft = useCallback(
     (next: CommitDraft) => {
@@ -179,51 +204,83 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
 
   // ── Deshacer ─────────────────────────────────────────────────────────────
 
-  const pushUndo = (entry: UndoEntry): void => setUndoStack((stack) => [...stack.slice(-(UNDO_LIMIT - 1)), entry])
-
-  const remember = async (label: string, undo: () => Promise<unknown>, hard = false): Promise<void> => {
-    const after = await api.getRepoState(repo).catch(() => null)
-    if (after && !after.operation) pushUndo({ label, head: after.head, branch: after.branch, hard, undo })
+  /** Una acción nueva invalida lo que se podía rehacer */
+  const pushUndo = (entry: UndoEntry): void => {
+    setUndoStack((stack) => [...stack.slice(-(UNDO_LIMIT - 1)), entry])
+    setRedoStack([])
   }
 
-  /** Ejecuta una operación que mueve HEAD y registra cómo volver al estado anterior. */
-  const runUndoable = async (
-    label: string,
-    fn: () => Promise<unknown>,
-    success: string,
-    makeUndo: (before: RepoState) => { undo: () => Promise<unknown>; hard?: boolean } | null
-  ): Promise<boolean> => {
+  /** Registra una acción que no mueve HEAD (ramas, etiquetas): `redo` repite la acción original. */
+  const remember = async (label: string, undo: () => Promise<unknown>, redo: (() => Promise<unknown>) | null, hard = false): Promise<void> => {
+    const after = await api.getRepoState(repo).catch(() => null)
+    if (after && !after.operation) pushUndo({ label, head: after.head, branch: after.branch, hard, undo, redo, redoHard: false })
+  }
+
+  /** Ejecuta una operación que mueve HEAD y registra cómo volver al estado anterior (y cómo rehacerla). */
+  const runUndoable = async (label: string, fn: () => Promise<unknown>, success: string, makeUndo: (before: RepoState) => UndoPlan | null): Promise<boolean> => {
     const before = await api.getRepoState(repo).catch(() => null)
     const ok = await run(label, fn, success)
     if (!ok || !before) return ok
     const after = await api.getRepoState(repo).catch(() => null)
     if (!after || after.operation || (after.head === before.head && after.branch === before.branch)) return ok
     const plan = makeUndo(before)
-    if (plan) pushUndo({ label, head: after.head, branch: after.branch, hard: !!plan.hard, undo: plan.undo })
+    if (!plan) return ok
+    const mode = plan.mode ?? (plan.hard ? 'hard' : 'soft')
+    pushUndo({ label, head: after.head, branch: after.branch, hard: !!plan.hard, undo: plan.undo, redo: plan.redo ?? (async () => (await redoTo(after, mode)(), plan.onRedo?.())), redoHard: mode === 'hard' })
     return ok
   }
 
   const backTo = (before: RepoState) => () =>
     before.branch ? api.checkout(repo, { kind: 'local', name: before.branch }) : api.checkout(repo, { kind: 'commit', hash: before.head! })
 
-  const resetTo = (before: RepoState, mode: ResetMode = 'hard') =>
-    before.head ? { undo: () => api.reset(repo, before.head!, mode), hard: mode === 'hard' } : null
+  const resetTo = (before: RepoState, mode: ResetMode = 'hard'): UndoPlan | null =>
+    before.head ? { undo: () => api.reset(repo, before.head!, mode), hard: mode === 'hard', mode } : null
+
+  /** Rehacer genérico: volver a la rama que dejó la operación y ponerla en el commit que dejó. */
+  const redoTo = (after: RepoState, mode: ResetMode) => async (): Promise<void> => {
+    const now = await api.getRepoState(repo)
+    if (after.branch && now.branch !== after.branch) await api.checkout(repo, { kind: 'local', name: after.branch })
+    else if (!after.branch && after.head && (now.branch || now.head !== after.head)) return void (await api.checkout(repo, { kind: 'commit', hash: after.head }))
+    const current = await api.getRepoState(repo)
+    if (after.head && current.head !== after.head) await api.reset(repo, after.head, mode)
+  }
+
+  /** Comprueba que el repo siga en el estado de la entrada; si no, vacía la pila para no deshacer algo distinto. */
+  const entryValid = async (entry: UndoEntry, clear: () => void): Promise<boolean> => {
+    const now = await api.getRepoState(repo)
+    if (now.head === entry.head && now.branch === entry.branch && !now.operation) return true
+    clear()
+    toast('info', 'Ya no se puede', 'El repositorio cambió desde la última acción (quizá desde la terminal).')
+    return false
+  }
 
   const undoLast = async (): Promise<void> => {
     const entry = undoStack[undoStack.length - 1]
     if (!entry) return toast('info', 'No hay nada que deshacer')
     if (busyRef.current) return toast('info', `Espera a que termine: ${busyRef.current}`)
-    const now = await api.getRepoState(repo)
-    if (now.head !== entry.head || now.branch !== entry.branch || now.operation) {
-      setUndoStack([])
-      return toast('info', 'Ya no se puede deshacer', 'El repositorio cambió desde la última acción (quizá desde la terminal).')
-    }
+    if (!(await entryValid(entry, () => (setUndoStack([]), setRedoStack([]))))) return
     if (entry.hard) {
       if (hasTrackedChanges) return toast('error', `No se puede deshacer "${entry.label}"`, 'Tienes cambios sin confirmar. Haz commit o stash primero.')
-      if (!(await confirm(`¿Deshacer "${entry.label}"?`, 'Deshacer', 'Los commits creados por esa acción dejarán de estar en la rama.'))) return
+      if (!(await confirm(`¿Deshacer "${entry.label}"?`, 'Deshacer', 'Los commits creados por esa acción dejarán de estar en la rama (podrás rehacerla).'))) return
     }
     const ok = await run('Deshacer', entry.undo, `Deshecho: ${entry.label}`)
-    if (ok) setUndoStack((stack) => stack.slice(0, -1))
+    if (!ok) return
+    setUndoStack((stack) => stack.slice(0, -1))
+    const after = await api.getRepoState(repo).catch(() => null)
+    if (entry.redo && after && !after.operation) setRedoStack((stack) => [...stack, { ...entry, head: after.head, branch: after.branch }])
+  }
+
+  const redoLast = async (): Promise<void> => {
+    const entry = redoStack[redoStack.length - 1]
+    if (!entry?.redo) return toast('info', 'No hay nada que rehacer')
+    if (busyRef.current) return toast('info', `Espera a que termine: ${busyRef.current}`)
+    if (!(await entryValid(entry, () => setRedoStack([])))) return
+    if (entry.redoHard && hasTrackedChanges) return toast('error', `No se puede rehacer "${entry.label}"`, 'Tienes cambios sin confirmar. Haz commit o stash primero.')
+    const ok = await run('Rehacer', entry.redo, `Rehecho: ${entry.label}`)
+    if (!ok) return
+    setRedoStack((stack) => stack.slice(0, -1))
+    const after = await api.getRepoState(repo).catch(() => null)
+    if (after && !after.operation) setUndoStack((stack) => [...stack.slice(-(UNDO_LIMIT - 1)), { ...entry, head: after.head, branch: after.branch }])
   }
 
   // ── Filtro del gráfico ───────────────────────────────────────────────────
@@ -260,18 +317,280 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
 
   // ── Remotos ──────────────────────────────────────────────────────────────
 
+  /** Fetch de todos los remotos; además adelanta las ramas locales que solo estaban atrasadas (la actual solo a mano). */
   const fetchAll = (silent = false): void => {
     if (silent) {
       api.fetch(repo).then(
-        () => setLastFetch(Date.now()),
+        () => (setLastFetch(Date.now()), void refreshAll()),
         () => {}
       )
+      void loadPrs()
       return
     }
-    void run('Fetch', async () => {
-      await api.fetch(repo)
-      setLastFetch(Date.now())
-    }, 'Fetch completado')
+    void loadPrs()
+    void (async () => {
+      let result: FetchResult | null = null
+      const ok = await run('Fetch', async () => {
+        result = await api.fetch(repo, { updateCurrent: true })
+        setLastFetch(Date.now())
+      })
+      if (!ok || !result) return
+      const { updated, diverged, skipped, unshallowed } = result as FetchResult
+      const names = (list: string[]): string => (list.length > 3 ? `${list.slice(0, 3).join(', ')} y ${list.length - 3} más` : list.join(', '))
+      const lines = [
+        unshallowed && 'Se trajo la historia completa (el clon era superficial).',
+        updated.length > 0 && `${updated.length === 1 ? 'Rama adelantada' : `${updated.length} ramas adelantadas`} hasta su remota: ${names(updated.map((u) => u.branch))}.`,
+        diverged.length > 0 && `${names(diverged)} ${diverged.length === 1 ? 'tiene' : 'tienen'} commits propios y del remoto: haz pull (merge o rebase).`,
+        ...skipped.map((k) => `${k.branch} no se adelantó: ${k.reason}.`)
+      ].filter(Boolean) as string[]
+      toast(diverged.length || skipped.length ? 'info' : 'success', 'Fetch completado', lines.join('\n') || 'Todas las ramas locales están al día.')
+      if (!updated.length) return
+      // Deshacer devuelve las ramas locales a donde estaban (las remotas siguen actualizadas)
+      const current = updated.find((u) => u.current)
+      const others = updated.filter((u) => !u.current)
+      const after = await api.getRepoState(repo).catch(() => null)
+      if (!after || after.operation) return
+      pushUndo({
+        label: `Adelantar ${updated.length === 1 ? updated[0].branch : `${updated.length} ramas`} tras el fetch`,
+        head: after.head,
+        branch: after.branch,
+        hard: !!current,
+        redoHard: !!current,
+        undo: async () => {
+          for (const u of others) await api.moveBranch(repo, u.branch, u.from)
+          if (current) await api.reset(repo, current.from, 'hard')
+        },
+        redo: async () => {
+          for (const u of others) await api.moveBranch(repo, u.branch, u.to)
+          if (current) await api.reset(repo, current.to, 'hard')
+        }
+      })
+    })()
+  }
+
+  // ── Pull requests ────────────────────────────────────────────────────────
+
+  const loadPrs = useCallback(async (): Promise<void> => {
+    setPrsLoading(true)
+    try {
+      setPrs(await api.getPullRequests(repo))
+    } catch {
+      setPrs(null)
+    } finally {
+      setPrsLoading(false)
+    }
+  }, [repo])
+
+  useEffect(() => {
+    void loadPrs()
+  }, [loadPrs])
+
+  const prWord = prs?.provider === 'gitlab' ? 'merge request' : 'pull request'
+
+  const openUrl = (url: string): void => {
+    api.openExternal(url).catch((e) => toast('error', 'No se pudo abrir el enlace', errorText(e)))
+  }
+
+  /**
+   * Abre la página del proveedor para crear el PR de una rama (la persona lo revisa y lo envía allí).
+   * Si la rama no está subida, ofrece subirla primero; `base` elige la rama de destino.
+   */
+  const createPr = async (branch = currentBranch, upstream = headRef?.upstream, base?: string): Promise<void> => {
+    if (!prs?.webUrl) return toast('info', `El remoto no es de GitHub ni de GitLab: no se puede crear un ${prWord} desde aquí`)
+    if (!branch) return toast('error', 'No estás en ninguna rama')
+    if (!upstream) {
+      const ok = await confirm(`${branch} todavía no está en el remoto`, 'Hacer push', `Para crear el ${prWord} primero hay que subir la rama.`)
+      if (!ok) return
+      const remote = prs.remote ?? 'origin'
+      if (branch === currentBranch) await push()
+      else await run('Push', () => api.pushBranch(repo, branch, remote, branch, { setUpstream: true }), `${branch} subida a ${remote}`)
+      const pushed = (await api.getRefs(repo).catch(() => [])).find((r) => r.type === 'local' && r.name === branch)
+      if (!pushed?.upstream) return
+      upstream = pushed.upstream
+    }
+    const remoteBranch = upstream.slice(upstream.indexOf('/') + 1)
+    const path = (name: string): string => name.split('/').map(encodeURIComponent).join('/')
+    openUrl(
+      prs.provider === 'gitlab'
+        ? `${prs.webUrl}/-/merge_requests/new?merge_request%5Bsource_branch%5D=${encodeURIComponent(remoteBranch)}${base ? `&merge_request%5Btarget_branch%5D=${encodeURIComponent(base)}` : ''}`
+        : base
+          ? `${prs.webUrl}/compare/${path(base)}...${path(remoteBranch)}?expand=1`
+          : `${prs.webUrl}/pull/new/${path(remoteBranch)}`
+    )
+  }
+
+  /** La rama del PR tal como la conocemos: local con ese nombre o remota en origin */
+  const prRef = (pr: PullRequest): Ref | undefined =>
+    refs.find((r) => r.type === 'local' && r.name === pr.head) ?? refs.find((r) => r.type === 'remote' && r.name.slice(r.remote!.length + 1) === pr.head)
+  const prBaseRef = (pr: PullRequest): Ref | undefined =>
+    refs.find((r) => r.type === 'remote' && r.name.slice(r.remote!.length + 1) === pr.base) ?? refs.find((r) => r.type === 'local' && r.name === pr.base)
+
+  const selectPr = (pr: PullRequest): void => {
+    const ref = prRef(pr)
+    if (ref) select(ref.hash, true)
+    else toast('info', `La rama ${pr.head} no está en tu repo`, 'Haz fetch o checkout del pull request para traerla.')
+  }
+
+  const checkoutPr = (pr: PullRequest): void => {
+    void runUndoable(`Checkout de #${pr.number}`, () => api.checkoutPullRequest(repo, pr.number), `Ahora estás en el ${prWord} #${pr.number}`, (b) => (b.head ? { undo: backTo(b) } : null))
+  }
+
+  const prMenu = async (pr: PullRequest): Promise<void> => {
+    const head = prRef(pr)
+    const baseRef = prBaseRef(pr)
+    const id = await api.contextMenu([
+      { id: 'open', label: 'Abrir en el navegador' },
+      { id: 'checkout', label: `Checkout del ${prWord}` },
+      { id: 'compare', label: `Comparar ${pr.head} con ${pr.base}`, enabled: !!head && !!baseRef },
+      { type: 'separator' },
+      { id: 'copy', label: 'Copiar enlace' }
+    ])
+    if (id === 'open') openUrl(pr.url)
+    else if (id === 'checkout') checkoutPr(pr)
+    else if (id === 'compare' && head && baseRef) startCompare({ hash: baseRef.hash, label: baseRef.name }, { hash: head.hash, label: head.name })
+    else if (id === 'copy') copy(pr.url, 'Enlace')
+  }
+
+  // ── Worktrees y LFS ──────────────────────────────────────────────────────
+
+  const newWorktree = async (branch?: string): Promise<void> => {
+    const parent = await api.pickDirectory('¿En qué carpeta crear el worktree?')
+    if (!parent) return
+    const exists = (name: string): boolean => refs.some((r) => r.type === 'local' && r.name === name)
+    const result = await prompt({
+      title: 'Nuevo worktree',
+      label: `Rama que se abrirá en ${homeRelative(parent)}/…`,
+      placeholder: 'feature/en-paralelo',
+      initial: branch,
+      confirmLabel: 'Crear worktree',
+      checkboxLabel: 'Crear una rama nueva desde HEAD',
+      checkboxDefault: !branch,
+      validate: (v) => (/\s/.test(v) ? 'El nombre no puede tener espacios' : null)
+    })
+    if (!result) return
+    if (result.checked && exists(result.value)) return toast('error', `Ya existe la rama ${result.value}`, 'Desmarca "Crear una rama nueva" para usarla.')
+    if (!result.checked && !exists(result.value)) return toast('error', `No existe la rama ${result.value}`, 'Marca "Crear una rama nueva" para crearla.')
+    const folder = `${parent}/${repoName(repo)}-${result.value.replace(/[^\w.-]+/g, '-')}`
+    let created: string | null = null
+    const ok = await run('Crear worktree', async () => {
+      created = await api.addWorktree(repo, folder, result.value, result.checked)
+    }, `Worktree creado en ${homeRelative(folder)}`)
+    if (ok && created) onOpenRepo(created)
+  }
+
+  const worktreeMenu = async (tree: Worktree): Promise<void> => {
+    const current = tree.path === repo
+    const id = await api.contextMenu([
+      { id: 'open', label: current ? 'Es el worktree de esta pestaña' : 'Abrir en una pestaña', enabled: !current && !tree.prunable },
+      { id: 'copy', label: 'Copiar ruta' },
+      { type: 'separator' },
+      { id: 'remove', label: 'Eliminar worktree…', enabled: !tree.isMain && !current },
+      ...(tree.prunable ? [{ id: 'prune', label: 'Limpiar worktrees que ya no existen' }] : [])
+    ])
+    if (id === 'open') onOpenRepo(tree.path)
+    else if (id === 'copy') copy(tree.path, 'Ruta')
+    else if (id === 'prune') void run('Limpiar worktrees', () => api.pruneWorktrees(repo), 'Worktrees limpiados')
+    else if (id === 'remove') {
+      const ok = await confirm(`¿Eliminar el worktree ${homeRelative(tree.path)}?`, 'Eliminar', `Se borra esa carpeta. La rama${tree.branch ? ` ${tree.branch}` : ''} y sus commits se conservan.`, true)
+      if (!ok) return
+      try {
+        await api.removeWorktree(repo, tree.path, false)
+        toast('success', 'Worktree eliminado')
+      } catch (e) {
+        if (/modified or untracked|contains modified|is dirty/i.test(errorText(e))) {
+          const force = await confirm('El worktree tiene cambios sin confirmar', 'Eliminar de todos modos', 'Esos cambios se perderán.', true)
+          if (force) await run('Eliminar worktree', () => api.removeWorktree(repo, tree.path, true), 'Worktree eliminado')
+        } else toast('error', 'No se pudo eliminar el worktree', errorText(e))
+      } finally {
+        void refreshAll()
+      }
+    }
+  }
+
+  const lfsTrack = async (): Promise<void> => {
+    const result = await prompt({
+      title: 'Seguir con Git LFS',
+      label: 'Los archivos que coincidan se guardarán en LFS (se modifica .gitattributes)',
+      placeholder: '*.psd',
+      confirmLabel: 'Seguir',
+      validate: (v) => (v.startsWith('-') ? 'Patrón no válido' : null)
+    })
+    if (result) await run('LFS', () => api.lfsTrack(repo, result.value), `${result.value} se guardará en LFS. Haz commit de .gitattributes.`)
+  }
+
+  const lfsPatternMenu = async (pattern: string): Promise<void> => {
+    const id = await api.contextMenu([{ id: 'untrack', label: `Dejar de seguir ${pattern}` }])
+    if (id === 'untrack') await run('LFS', () => api.lfsUntrack(repo, pattern), `${pattern} ya no se guarda en LFS`)
+  }
+
+  const lfsPull = (): void => void run('Descargar LFS', () => api.lfsPull(repo), 'Archivos LFS descargados')
+
+  // ── Comparar y rebase interactivo ────────────────────────────────────────
+
+  /** Nombre corto de un commit para mostrar: su rama (o etiqueta) si tiene, si no el SHA */
+  const nameOf = (hash: string): string => {
+    const list = labels.get(hash) ?? []
+    const label = list.find((l) => l.isHead) ?? list.find((l) => l.local) ?? list[0]
+    return label?.name ?? shortHash(hash)
+  }
+
+  const startCompare = (base: CompareEnd, target: CompareEnd): void => {
+    if (base.hash === target.hash) return toast('info', 'Es el mismo commit: no hay nada que comparar')
+    setFileTool(null)
+    setDiff(null)
+    setSelection({ kind: 'compare', base, target })
+    setScrollTarget({ hash: target.hash, nonce: Date.now() })
+  }
+
+  const closeCompare = (): void => {
+    if (selection?.kind !== 'compare') return
+    setDiff(null)
+    setSelection({ kind: 'commit', hash: selection.target.hash })
+  }
+
+  /** Commits alcanzables desde HEAD entre los cargados: solo esos admiten rebase interactivo */
+  const ancestorsOfHead = (): Set<string> => {
+    const byHash = new Map(commits.map((c) => [c.hash, c]))
+    const seen = new Set<string>()
+    const stack = head ? [head] : []
+    while (stack.length) {
+      const hash = stack.pop()!
+      if (seen.has(hash)) continue
+      seen.add(hash)
+      stack.push(...(byHash.get(hash)?.parents ?? []))
+    }
+    return seen
+  }
+
+  const startRebase = async (steps: RebaseStep[]): Promise<void> => {
+    const plan = rebasePlan
+    setRebasePlan(null)
+    if (!plan) return
+    if (hasTrackedChanges && !(await confirm('Tienes cambios sin confirmar', 'Continuar', 'Se guardan en un stash automático durante el rebase y se restauran al terminar.'))) return
+    if (plan.mode === 'from') {
+      await runUndoable(`Rebase interactivo de ${currentBranch ?? 'HEAD'}`, () => api.interactiveRebase(repo, plan.base, steps), 'Rebase interactivo completado', (b) => resetTo(b))
+      return
+    }
+    // Sobre otra rama: se cambia a la rama que se reescribe y, al deshacer, se vuelve a donde se estaba
+    const tip = plan.tip!
+    const tipRef = refs.find((r) => r.type === 'local' && r.name === tip)
+    if (!tipRef) return toast('error', `La rama ${tip} ya no existe`)
+    const needsCheckout = tip !== currentBranch
+    await runUndoable(
+      `Rebase interactivo de ${tip} sobre ${plan.baseName}`,
+      async () => {
+        if (needsCheckout) await api.checkout(repo, { kind: 'local', name: tip })
+        await api.interactiveRebase(repo, plan.base, steps, 'onto')
+      },
+      `${tip} ahora está sobre ${plan.baseName}`,
+      (before) => ({
+        hard: true,
+        undo: async () => {
+          await api.reset(repo, tipRef.hash, 'hard')
+          if (needsCheckout && before.head) await backTo(before)()
+        }
+      })
+    )
   }
 
   const pull = (mode: PullMode): void => {
@@ -320,12 +639,17 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     })
     if (!result) return
     const before = await api.getRepoState(repo).catch(() => null)
-    const ok = await run('Crear rama', () => api.createBranch(repo, result.value, start ?? 'HEAD', result.checked), `Rama ${result.value} creada`)
+    const from = start ?? before?.head ?? 'HEAD'
+    const ok = await run('Crear rama', () => api.createBranch(repo, result.value, from, result.checked), `Rama ${result.value} creada`)
     if (ok && before)
-      await remember(`Crear rama ${result.value}`, async () => {
-        if (result.checked && before.head) await backTo(before)()
-        await api.deleteBranch(repo, result.value, true)
-      })
+      await remember(
+        `Crear rama ${result.value}`,
+        async () => {
+          if (result.checked && before.head) await backTo(before)()
+          await api.deleteBranch(repo, result.value, true)
+        },
+        () => api.createBranch(repo, result.value, from, result.checked)
+      )
   }
 
   const checkoutRef = async (ref: Ref): Promise<void> => {
@@ -367,34 +691,107 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     if (ok) await runUndoable(`Rebase sobre ${onto}`, () => api.rebase(repo, onto), `Rebase de ${currentBranch} sobre ${onto} completado`, (b) => resetTo(b))
   }
 
-  const dropLabel = async (source: string, target: RefLabel): Promise<void> => {
-    const targetName = target.local!.name
-    const id = await api.contextMenu([
-      { id: 'merge', label: `Merge de ${source} en ${targetName}` },
-      { id: 'rebase', label: `Rebase de ${targetName} sobre ${source}` }
-    ])
-    if (!id) return
-    const needsCheckout = !target.local!.isHead
-    const targetHash = target.local!.hash
-    const undoDrop = (before: RepoState) => ({
-      hard: true,
-      undo: async () => {
-        await api.reset(repo, targetHash, 'hard')
-        if (needsCheckout && before.head) await backTo(before)()
+  // ── Arrastrar y soltar ramas ─────────────────────────────────────────────
+
+  /** La etiqueta del gráfico que representa una rama del panel (local y remota juntas si están en el mismo commit) */
+  const labelForRef = (ref: Ref): RefLabel =>
+    labels.get(ref.hash)?.find((l) => l.local?.fullName === ref.fullName || l.remotes.some((r) => r.fullName === ref.fullName)) ??
+    (ref.type === 'local'
+      ? { key: ref.fullName, kind: 'branch', name: ref.name, local: ref, remotes: [], isHead: !!ref.isHead }
+      : { key: ref.fullName, kind: 'branch', name: ref.name, remotes: [ref], isHead: false })
+
+  const dropRef = async (sourceName: string, target: DropTarget): Promise<void> => {
+    const source = refs.find((r) => r.fullName === sourceName && r.type !== 'tag')
+    if (!source) return
+    const against = dropTargetRef(source, target, refs)
+    const div = against ? await api.divergence(repo, source.fullName, against.fullName).catch(() => null) : null
+    if (against && !div) return toast('error', 'No se pudo comparar las ramas')
+    const items = planDrop(source, target, div, { refs, currentBranch, prRemote: prs?.webUrl ? prs.remote : null, prWord })
+    if (!items.length) return
+    const id = await api.contextMenu(items.map((item, i): MenuItemSpec => (item.separator ? { type: 'separator' } : { id: String(i), label: item.label, enabled: !!item.action })))
+    const action = id === null ? undefined : items[Number(id)]?.action
+    if (action) await runDrop(action)
+  }
+
+  const runDrop = async (action: DropAction): Promise<void> => {
+    switch (action.id) {
+      case 'ff': {
+        const label = `Fast-forward de ${action.branch} a ${action.toName}`
+        if (action.current) {
+          await runUndoable(label, () => api.fastForward(repo, action.branch, action.to), `${action.branch} avanzó hasta ${action.toName}`, (b) => resetTo(b))
+          return
+        }
+        const before = refs.find((r) => r.type === 'local' && r.name === action.branch)
+        const to = refs.find((r) => r.fullName === action.to)
+        if (!before || !to) return
+        if (await run(label, () => api.fastForward(repo, action.branch, action.to), `${action.branch} avanzó hasta ${action.toName}`)) {
+          await remember(label, () => api.moveBranch(repo, action.branch, before.hash), () => api.moveBranch(repo, action.branch, to.hash))
+        }
+        return
       }
-    })
-    if (id === 'merge') {
-      await runUndoable(`Merge de ${source} en ${targetName}`, async () => {
-        if (needsCheckout) await api.checkout(repo, { kind: 'local', name: targetName })
-        await api.merge(repo, source)
-      }, `Merge de ${source} en ${targetName} completado`, undoDrop)
-    } else {
-      const ok = await confirm(`¿Hacer rebase de ${targetName} sobre ${source}?`, 'Rebase', 'Reescribe los commits de la rama.')
-      if (!ok) return
-      await runUndoable(`Rebase de ${targetName} sobre ${source}`, async () => {
-        if (needsCheckout) await api.checkout(repo, { kind: 'local', name: targetName })
-        await api.rebase(repo, source)
-      }, `Rebase de ${targetName} sobre ${source} completado`, undoDrop)
+      case 'merge': {
+        const target = refs.find((r) => r.type === 'local' && r.name === action.into)
+        if (!target) return
+        await runUndoable(
+          `Merge de ${action.sourceName} en ${action.into}`,
+          async () => {
+            if (!action.current) await api.checkout(repo, { kind: 'local', name: action.into })
+            await api.merge(repo, action.source)
+          },
+          `Merge de ${action.sourceName} en ${action.into} completado`,
+          (before) => ({
+            hard: true,
+            undo: async () => {
+              await api.reset(repo, target.hash, 'hard')
+              if (!action.current && before.head) await backTo(before)()
+            }
+          })
+        )
+        return
+      }
+      case 'rebase': {
+        const branch = refs.find((r) => r.type === 'local' && r.name === action.branch)
+        if (!branch) return
+        const ok = await confirm(`¿Hacer rebase de ${action.branch} sobre ${action.ontoName}?`, 'Rebase', 'Reescribe los commits de la rama. Si ya la compartiste, tendrás que forzar el push.')
+        if (!ok) return
+        await runUndoable(
+          `Rebase de ${action.branch} sobre ${action.ontoName}`,
+          async () => {
+            if (!action.current) await api.checkout(repo, { kind: 'local', name: action.branch })
+            await api.rebase(repo, action.onto)
+          },
+          `Rebase de ${action.branch} sobre ${action.ontoName} completado`,
+          (before) => ({
+            hard: true,
+            undo: async () => {
+              await api.reset(repo, branch.hash, 'hard')
+              if (!action.current && before.head) await backTo(before)()
+            }
+          })
+        )
+        return
+      }
+      case 'rebase-i':
+        if (state?.operation) return toast('error', 'Hay otra operación en curso', 'Termínala o abórtala primero.')
+        setRebasePlan({ base: action.onto, mode: 'onto', tip: action.branch, baseName: action.ontoName })
+        return
+      case 'push': {
+        const where = `${action.remote}/${action.remoteBranch}`
+        if (action.force) {
+          const ok = await confirm(
+            `${where} tiene commits que ${action.branch} no tiene`,
+            'Forzar push',
+            'Se sobrescribe la rama remota con --force-with-lease: solo si nadie la cambió desde tu último fetch. Los commits que solo están allí dejarán de estar en la rama.',
+            true
+          )
+          if (!ok) return
+        }
+        await run(action.force ? 'Push forzado' : 'Push', () => api.pushBranch(repo, action.branch, action.remote, action.remoteBranch, { force: action.force, setUpstream: action.setUpstream }), `${action.branch} subida a ${where}`)
+        return
+      }
+      case 'pr':
+        await createPr(action.branch, action.head ? `${prs?.remote ?? 'origin'}/${action.head}` : undefined, action.base)
+        return
     }
   }
 
@@ -402,14 +799,15 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     if (ref.isHead) return toast('error', 'No puedes eliminar la rama en la que estás')
     if (!(await confirm(`¿Eliminar la rama ${ref.name}?`, 'Eliminar', undefined, true))) return
     const restore = () => api.createBranch(repo, ref.name, ref.hash, false)
+    const again = () => api.deleteBranch(repo, ref.name, true)
     try {
       await api.deleteBranch(repo, ref.name, false)
       toast('success', `Rama ${ref.name} eliminada`)
-      await remember(`Eliminar rama ${ref.name}`, restore)
+      await remember(`Eliminar rama ${ref.name}`, restore, again)
     } catch (e) {
       if (/not fully merged/i.test(errorText(e))) {
         const force = await confirm(`${ref.name} tiene commits que no están en ninguna otra rama`, 'Eliminar de todos modos', 'Puedes recuperarla con Deshacer mientras no cambies nada más.', true)
-        if (force && (await run('Eliminar rama', () => api.deleteBranch(repo, ref.name, true), `Rama ${ref.name} eliminada`))) await remember(`Eliminar rama ${ref.name}`, restore)
+        if (force && (await run('Eliminar rama', () => api.deleteBranch(repo, ref.name, true), `Rama ${ref.name} eliminada`))) await remember(`Eliminar rama ${ref.name}`, restore, again)
       } else toast('error', 'No se pudo eliminar la rama', errorText(e))
     } finally {
       void refreshAll()
@@ -419,7 +817,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
   const renameBranch = async (ref: Ref): Promise<void> => {
     const result = await prompt({ title: 'Renombrar rama', initial: ref.name, confirmLabel: 'Renombrar', validate: (v) => (/\s/.test(v) ? 'El nombre no puede tener espacios' : null) })
     if (result && result.value !== ref.name && (await run('Renombrar rama', () => api.renameBranch(repo, ref.name, result.value), `Rama renombrada a ${result.value}`))) {
-      await remember(`Renombrar ${ref.name}`, () => api.renameBranch(repo, result.value, ref.name))
+      await remember(`Renombrar ${ref.name}`, () => api.renameBranch(repo, result.value, ref.name), () => api.renameBranch(repo, ref.name, result.value))
     }
   }
 
@@ -433,7 +831,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       validate: (v) => (/\s/.test(v) ? 'El nombre no puede tener espacios' : refs.some((r) => r.type === 'tag' && r.name === v) ? 'Ya existe esa etiqueta' : null)
     })
     if (result && (await run('Crear etiqueta', () => api.createTag(repo, result.value, hash, result.secondary), `Etiqueta ${result.value} creada`))) {
-      await remember(`Crear etiqueta ${result.value}`, () => api.deleteTag(repo, result.value))
+      await remember(`Crear etiqueta ${result.value}`, () => api.deleteTag(repo, result.value), () => api.createTag(repo, result.value, hash, result.secondary))
     }
   }
 
@@ -489,6 +887,16 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     }
   }
 
+  /** Deshacer un commit devuelve sus cambios a preparados y el mensaje a la caja; rehacerlo los vuelve a confirmar. */
+  const commitUndo = (before: RepoState, saved: CommitDraft): UndoPlan | null => {
+    if (!before.head) return null
+    return {
+      mode: 'soft',
+      undo: async () => (await api.reset(repo, before.head!, 'soft'), setDraft({ ...saved, amend: false })),
+      onRedo: () => setDraft(EMPTY_DRAFT)
+    }
+  }
+
   const commitMessage = (): string => (draft.body.trim() ? `${draft.summary.trim()}\n\n${draft.body.trim()}` : draft.summary.trim())
 
   const commit = async (): Promise<void> => {
@@ -497,9 +905,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       return
     }
     const saved = draft
-    const ok = await runUndoable(draft.amend ? 'Amend' : `Commit "${draft.summary.trim()}"`, () => api.commit(repo, commitMessage(), draft.amend), draft.amend ? 'Commit modificado' : 'Commit creado', (b) =>
-      b.head ? { undo: async () => (await api.reset(repo, b.head!, 'soft'), setDraft({ ...saved, amend: false })) } : null
-    )
+    const ok = await runUndoable(draft.amend ? 'Amend' : `Commit "${draft.summary.trim()}"`, () => api.commit(repo, commitMessage(), draft.amend), draft.amend ? 'Commit modificado' : 'Commit creado', (b) => commitUndo(b, saved))
     if (ok) setDraft(EMPTY_DRAFT)
   }
 
@@ -512,7 +918,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     const ok = await runUndoable(`Commit "${draft.summary.trim()}"`, async () => {
       await api.stageAll(repo)
       await api.commit(repo, commitMessage(), draft.amend)
-    }, 'Commit creado', (b) => (b.head ? { undo: async () => (await api.reset(repo, b.head!, 'soft'), setDraft({ ...saved, amend: false })) } : null))
+    }, 'Commit creado', (b) => commitUndo(b, saved))
     if (ok) setDraft(EMPTY_DRAFT)
   }
 
@@ -541,10 +947,16 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
   const commitMenu = async (commit: Commit): Promise<void> => {
     const stashEntry = commit.stash !== undefined ? stashes.find((s) => s.index === commit.stash) : undefined
     if (stashEntry) return stashMenu(stashEntry)
+    // El clic derecho ya selecciona la fila, pero este cierre conserva la selección anterior
+    const previous = selection?.kind === 'commit' ? selection.hash : selection?.kind === 'compare' ? selection.target.hash : null
     const items: MenuItemSpec[] = [
       { id: 'checkout', label: 'Checkout de este commit', enabled: commit.hash !== head },
       { id: 'branch', label: 'Crear rama aquí…' },
       { id: 'tag', label: 'Crear etiqueta aquí…' },
+      { type: 'separator' },
+      { id: 'compare-head', label: `Comparar con ${currentBranch ?? 'HEAD'}`, enabled: !!head && commit.hash !== head },
+      ...(previous && previous !== commit.hash ? [{ id: 'compare-selected', label: `Comparar con ${nameOf(previous)} (seleccionado)` }] : []),
+      { id: 'rebase-i', label: 'Rebase interactivo desde aquí…', enabled: !!head && !state?.operation && ancestorsOfHead().has(commit.hash) },
       { type: 'separator' },
       { id: 'cherry', label: `Cherry-pick en ${currentBranch ?? 'HEAD'}`, enabled: commit.hash !== head && !!head },
       { id: 'revert', label: 'Revertir este commit', enabled: !!head },
@@ -569,6 +981,9 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     else if (id === 'cherry') void runUndoable(`Cherry-pick de ${shortHash(commit.hash)}`, () => api.cherryPick(repo, commit.hash, isMerge), 'Cherry-pick completado', (b) => resetTo(b))
     else if (id === 'revert') void runUndoable(`Revertir ${shortHash(commit.hash)}`, () => api.revert(repo, commit.hash, isMerge), 'Commit revertido', (b) => resetTo(b))
     else if (id?.startsWith('reset:')) void reset(commit.hash, id.slice(6) as ResetMode)
+    else if (id === 'compare-head' && head) startCompare({ hash: commit.hash, label: nameOf(commit.hash) }, { hash: head, label: currentBranch ?? 'HEAD' })
+    else if (id === 'compare-selected' && previous) startCompare({ hash: previous, label: nameOf(previous) }, { hash: commit.hash, label: nameOf(commit.hash) })
+    else if (id === 'rebase-i') setRebasePlan({ base: commit.hash, mode: 'from' })
     else if (id === 'copy-sha') copy(commit.hash, 'SHA')
     else if (id === 'copy-msg') copy(commit.subject, 'Mensaje')
   }
@@ -585,6 +1000,10 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       ...(isCurrent ? [{ id: 'push', label: 'Push' }, { id: 'pull', label: 'Pull' }, { type: 'separator' } as MenuItemSpec] : []),
       { id: 'branch', label: 'Crear rama aquí…' },
       { id: 'tag', label: 'Crear etiqueta aquí…', enabled: ref.type !== 'tag' },
+      ...(ref.type === 'local' ? [{ id: 'worktree', label: 'Abrir en un worktree nuevo…', enabled: !isCurrent }] : []),
+      { type: 'separator' },
+      { id: 'compare', label: `Comparar con ${currentBranch ?? 'HEAD'}`, enabled: !isCurrent && !!head && ref.hash !== head },
+      ...(prs?.webUrl && ref.type === 'local' ? [{ id: 'pr', label: `Crear ${prWord}…` }] : []),
       { type: 'separator' },
       { id: 'hide', label: isRefHidden(ref) ? 'Mostrar en el gráfico' : 'Ocultar en el gráfico', enabled: !isCurrent },
       { id: 'solo', label: 'Mostrar solo esta rama en el gráfico' },
@@ -604,6 +1023,9 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     else if (id === 'pull') pull(settings.pullMode)
     else if (id === 'branch') void newBranch(ref.hash)
     else if (id === 'tag') void createTag(ref.hash)
+    else if (id === 'worktree') void newWorktree(ref.name)
+    else if (id === 'compare' && head) startCompare({ hash: head, label: currentBranch ?? 'HEAD' }, { hash: ref.hash, label: ref.name })
+    else if (id === 'pr') void createPr(ref.name, ref.upstream)
     else if (id === 'hide') toggleHidden([ref])
     else if (id === 'solo') setFilter({ hidden: [], solo: withUpstream(ref) })
     else if (id === 'show-all') setFilter(NO_FILTER)
@@ -617,7 +1039,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       }
     } else if (id === 'delete-tag') {
       if (await confirm(`¿Eliminar la etiqueta ${ref.name}?`, 'Eliminar', 'Solo se elimina la etiqueta local.', true)) {
-        if (await run('Eliminar etiqueta', () => api.deleteTag(repo, ref.name), `Etiqueta ${ref.name} eliminada`)) await remember(`Eliminar etiqueta ${ref.name}`, () => api.createTag(repo, ref.name, ref.hash, ''))
+        if (await run('Eliminar etiqueta', () => api.deleteTag(repo, ref.name), `Etiqueta ${ref.name} eliminada`)) await remember(`Eliminar etiqueta ${ref.name}`, () => api.createTag(repo, ref.name, ref.hash, ''), () => api.deleteTag(repo, ref.name))
       }
     } else if (id === 'copy') copy(ref.name, 'Nombre')
   }
@@ -687,7 +1109,13 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     setFileTool({ kind, path: source.path, rev })
   }
 
-  const select = (hash: string, scroll = false): void => {
+  const select = (hash: string, scroll = false, extend = false): void => {
+    // ⌘/Ctrl+clic sobre otro commit: comparar lo que estaba seleccionado con este
+    const anchor = selection?.kind === 'commit' ? selection.hash : selection?.kind === 'compare' ? selection.base.hash : null
+    if (extend && anchor && hash !== WIP_HASH && !stashes.some((s) => s.hash === hash)) {
+      if (hash === anchor) return void (setDiff(null), setSelection({ kind: 'commit', hash }))
+      return startCompare(selection?.kind === 'compare' ? selection.base : { hash: anchor, label: nameOf(anchor) }, { hash, label: nameOf(hash) })
+    }
     setFileTool(null)
     const stashEntry = stashes.find((s) => s.hash === hash)
     setSelection(hash === WIP_HASH ? { kind: 'wip' } : stashEntry ? { kind: 'stash', index: stashEntry.index, hash } : { kind: 'commit', hash })
@@ -717,6 +1145,8 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     continueOperation: () => void continueOperation(),
     stashApply: (entry, pop) => void stashApply(entry, pop),
     stashDrop: (entry) => void stashDrop(entry),
+    swapCompare: () => selection?.kind === 'compare' && startCompare(selection.target, selection.base),
+    closeCompare,
     copy,
     fileMenu: (file, source) => void fileMenu(file, source)
   }
@@ -757,9 +1187,11 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     if (cmd && e.shiftKey && key === 'm') return e.preventDefault(), setSelection({ kind: 'wip' }), setSummaryFocus((n) => n + 1)
     if (cmd && key === 'enter' && !typing) return e.preventDefault(), void (e.shiftKey ? stageAllAndCommit() : commit())
     if (cmd && !e.shiftKey && key === 'z' && !typing) return e.preventDefault(), void undoLast()
+    if (cmd && e.shiftKey && key === 'z' && !typing) return e.preventDefault(), void redoLast()
     if (typing || cmd || e.altKey) return
     if (e.key === 'Escape' && fileTool) return setFileTool(null)
     if (e.key === 'Escape' && diff) return setDiff(null)
+    if (e.key === 'Escape' && selection?.kind === 'compare') return closeCompare()
     if (e.key === 'ArrowDown' || key === 'j') return e.preventDefault(), moveSelection(1)
     if (e.key === 'ArrowUp' || key === 'k') return e.preventDefault(), moveSelection(-1)
     if (key === 's' && diff?.kind === 'unstaged') return panelActions.stage(status.unstaged.filter((f) => f.path === diff.path))
@@ -781,8 +1213,28 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       { id: 'pull-rebase', group: 'Repositorio', label: 'Pull (rebase)', icon: <Icon.Pull size={14} />, run: () => pull('rebase') },
       { id: 'push', group: 'Repositorio', label: 'Push', icon: <Icon.Push size={14} />, run: () => void push() },
       ...(undoStack.length ? [{ id: 'undo', group: 'Repositorio', label: `Deshacer: ${undoStack[undoStack.length - 1].label}`, hint: `${mod}Z`, icon: <Icon.Undo size={14} />, run: () => void undoLast() }] : []),
+      ...(redoStack.length ? [{ id: 'redo', group: 'Repositorio', label: `Rehacer: ${redoStack[redoStack.length - 1].label}`, hint: `⇧${mod}Z`, icon: <Icon.Redo size={14} />, run: () => void redoLast() }] : []),
       ...(filterActive ? [{ id: 'show-all', group: 'Ver', label: 'Mostrar todas las ramas en el gráfico', icon: <Icon.Eye size={14} />, run: () => setFilter(NO_FILTER) }] : []),
       { id: 'branch', group: 'Rama', label: 'Nueva rama…', hint: `${mod}B`, icon: <Icon.Branch size={14} />, run: () => void newBranch() },
+      ...(selection?.kind === 'commit' && head && ancestorsOfHead().has(selection.hash) && !state?.operation
+        ? [{ id: 'rebase-i', group: 'Rama', label: `Rebase interactivo desde ${shortHash(selection.hash)}…`, icon: <Icon.Rebase size={14} />, run: () => setRebasePlan({ base: selection.hash, mode: 'from' }) }]
+        : []),
+      ...(selection?.kind === 'commit' && head && selection.hash !== head
+        ? [{ id: 'compare-head', group: 'Ver', label: `Comparar ${shortHash(selection.hash)} con ${currentBranch ?? 'HEAD'}`, icon: <Icon.Compare size={14} />, run: () => startCompare({ hash: selection.hash, label: nameOf(selection.hash) }, { hash: head, label: currentBranch ?? 'HEAD' }) }]
+        : []),
+      { id: 'worktree', group: 'Rama', label: 'Nuevo worktree…', icon: <Icon.Worktree size={14} />, run: () => void newWorktree() },
+      ...(prs?.webUrl
+        ? [
+            { id: 'pr-new', group: 'Repositorio', label: `Crear ${prWord} de ${currentBranch ?? 'la rama actual'}`, icon: <Icon.PullRequest size={14} />, run: () => void createPr() },
+            { id: 'pr-list', group: 'Repositorio', label: `Ver ${prWord}s en el navegador`, icon: <Icon.External size={14} />, run: () => openUrl(`${prs.webUrl}${prs.provider === 'gitlab' ? '/-/merge_requests' : '/pulls'}`) }
+          ]
+        : []),
+      ...(data.lfs?.installed
+        ? [
+            { id: 'lfs-track', group: 'LFS', label: 'Seguir un tipo de archivo con Git LFS…', icon: <Icon.Lfs size={14} />, run: () => void lfsTrack() },
+            { id: 'lfs-pull', group: 'LFS', label: 'Descargar archivos de Git LFS', icon: <Icon.Lfs size={14} />, run: lfsPull }
+          ]
+        : []),
       { id: 'stash', group: 'Stash', label: 'Guardar cambios en el stash…', icon: <Icon.Stash size={14} />, run: () => void stash() },
       ...(stashes[0] ? [{ id: 'pop', group: 'Stash', label: 'Aplicar el último stash (pop)', icon: <Icon.Pop size={14} />, run: () => void stashApply(stashes[0], true) }] : []),
       { id: 'stage-all', group: 'Cambios', label: 'Preparar todo', hint: `⇧${mod}S`, icon: <Icon.Plus size={14} />, run: panelActions.stageAll },
@@ -841,6 +1293,8 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
         leftVisible={settings.leftVisible}
         rightVisible={settings.rightVisible}
         undoLabel={undoStack[undoStack.length - 1]?.label ?? null}
+        redoLabel={redoStack[redoStack.length - 1]?.label ?? null}
+        onRedo={() => void redoLast()}
         repoMenu={
           repoMenu && (
             <RepoSwitcher
@@ -895,6 +1349,24 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
                 }}
                 onStashMenu={(entry) => void stashMenu(entry)}
                 onOpenSubmodule={(path) => onOpenRepo(`${repo}/${path}`)}
+                repo={repo}
+                worktrees={data.worktrees}
+                onOpenWorktree={(tree) => onOpenRepo(tree.path)}
+                onWorktreeMenu={(tree) => void worktreeMenu(tree)}
+                onNewWorktree={() => void newWorktree()}
+                lfs={data.lfs}
+                onLfsTrack={() => void lfsTrack()}
+                onLfsPull={lfsPull}
+                onLfsPatternMenu={(pattern) => void lfsPatternMenu(pattern)}
+                prs={prs}
+                prsLoading={prsLoading}
+                onRefreshPrs={() => void loadPrs()}
+                onCreatePr={() => void createPr()}
+                onRefDrop={(source, target) => void dropRef(source, target.kind === 'remote' ? target : { kind: 'label', label: labelForRef(target.ref) })}
+                onSelectPr={selectPr}
+                onActivatePr={checkoutPr}
+                onPrMenu={(pr) => void prMenu(pr)}
+                onOpenUrl={openUrl}
               />
             </div>
             <Resizer side="left" onResize={(d) => onSettings({ leftWidth: clamp(leftWidth + d, 180, 480) })} />
@@ -921,6 +1393,16 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
               onClose={() => setFileTool(null)}
               onHistory={() => setFileTool({ kind: 'history', path: fileTool.path, rev: null })}
               onSelectCommit={(hash) => select(hash, true)}
+            />
+          ) : diff?.kind === 'conflict' ? (
+            <MergeEditor
+              key={diff.path}
+              repo={repo}
+              path={diff.path}
+              currentBranch={currentBranch}
+              onClose={() => setDiff(null)}
+              onSaved={() => void refreshStatus()}
+              onResolveSide={(side) => void quick('No se pudo resolver', () => api.resolveConflict(repo, diff.path, side))}
             />
           ) : diff ? (
             <DiffView
@@ -952,6 +1434,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
               labels={labels}
               head={head}
               selected={selectedHash}
+              compareBase={compareBase}
               highlight={highlight}
               wipSummary={draft.summary}
               filterActive={filterActive}
@@ -962,11 +1445,11 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
               scrollTarget={scrollTarget}
               searchFocus={searchFocus}
               onColumnsChange={(columns) => onSettings({ columns })}
-              onSelect={(hash) => select(hash)}
+              onSelect={(hash, extend) => select(hash, false, extend)}
               onCommitMenu={(c) => void commitMenu(c)}
               onLabelMenu={labelMenu}
               onLabelActivate={activateLabel}
-              onLabelDrop={(source, target) => void dropLabel(source, target)}
+              onLabelDrop={(source, target) => void dropRef(source, { kind: 'label', label: target })}
               onCommitActivate={activateCommit}
               onLoadMore={loadMore}
             />
@@ -1019,6 +1502,18 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
         <span className="sb-item muted">{commits.length.toLocaleString('es')} commits</span>
       </footer>
       {palette && <CommandPalette items={paletteItems()} onClose={() => setPalette(false)} />}
+      {rebasePlan && (
+        <RebaseDialog
+          repo={repo}
+          base={rebasePlan.base}
+          mode={rebasePlan.mode}
+          tip={rebasePlan.tip}
+          baseName={rebasePlan.baseName}
+          branch={rebasePlan.tip ?? currentBranch}
+          onClose={() => setRebasePlan(null)}
+          onStart={(steps) => void startRebase(steps)}
+        />
+      )}
     </div>
   )
 }

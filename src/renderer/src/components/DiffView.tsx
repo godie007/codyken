@@ -109,7 +109,7 @@ export function DiffView(props: DiffViewProps) {
   }
 
   const label =
-    source.kind === 'unstaged' ? 'Sin preparar' : source.kind === 'staged' ? 'Preparado' : source.kind === 'conflict' ? 'En conflicto' : `Commit ${shortHash(source.hash)}`
+    source.kind === 'unstaged' ? 'Sin preparar' : source.kind === 'staged' ? 'Preparado' : source.kind === 'conflict' ? 'En conflicto' : source.label ?? `Commit ${shortHash(source.hash)}`
   const status = source.kind === 'conflict' ? 'U' : source.status
 
   let body: ReactNode

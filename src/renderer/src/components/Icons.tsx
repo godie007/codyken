@@ -48,6 +48,14 @@ export const Icon = {
   Blame: (p: IconProps) => base(<><circle cx="6" cy="7" r="2.5" /><path d="M2.5 15c.5-2.3 1.8-3.5 3.5-3.5s3 1.2 3.5 3.5M13 6h8M13 11h8M3 19h18" /></>, p),
   Tree: (p: IconProps) => base(<path d="M4 4h6M7 4v14h4M7 11h4M15 9h5v4h-5zM15 16h5v4h-5zM15 2h5v4h-5z" />, p),
   List: (p: IconProps) => base(<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />, p),
+  Compare: (p: IconProps) => base(<path d="M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 21V9M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM10 6h5M13 3l3 3-3 3M14 18H9M11 15l-3 3 3 3" />, p),
+  Swap: (p: IconProps) => base(<path d="M7 4l-4 4 4 4M3 8h14M17 12l4 4-4 4M21 16H7" />, p),
+  Rebase: (p: IconProps) => base(<path d="M6 3v18M6 7h6a4 4 0 0 1 4 4v10M13 18l3 3 3-3" />, p),
+  Worktree: (p: IconProps) => base(<path d="M3 6h7l2 2h9v11H3zM12 12v5M12 12h4" />, p),
+  PullRequest: (p: IconProps) => base(<path d="M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 9v12M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 15V8a2 2 0 0 0-2-2h-4M14 3l-3 3 3 3" />, p),
+  Lfs: (p: IconProps) => base(<path d="M4 7l8-4 8 4-8 4zM4 12l8 4 8-4M4 17l8 4 8-4" />, p),
+  Merge3: (p: IconProps) => base(<path d="M3 4h7v7H3zM14 4h7v7h-7zM8 14h8v7H8zM6.5 11v1.5H12V14M17.5 11v1.5H12" />, p),
+  External: (p: IconProps) => base(<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />, p),
   Redo: (p: IconProps) => base(<path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3" />, p)
 }
 

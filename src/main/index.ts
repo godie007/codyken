@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Api, ApiResult, MenuItemSpec } from '../shared/types'
 import * as gitOps from './git'
+import { checkoutPullRequest, getPullRequests } from './integrations'
 import { addRecent, getRecentRepos, getSettings, removeRecent, updateSettings } from './settings'
 import { RepoWatchers } from './watcher'
 
@@ -54,6 +55,8 @@ const handlers: Handlers = {
     return result.canceled ? null : result.filePaths[0] ?? null
   },
   confirm: async (win, options) => {
+    // Modo captura: los diálogos nativos bloquean el guion, así que se aceptan solos
+    if (snapshotPath && process.env.CODYKEN_SNAPSHOT_CONFIRM === '1') return true
     const result = await dialog.showMessageBox(win, {
       type: options.destructive ? 'warning' : 'question',
       message: options.message,
@@ -66,6 +69,14 @@ const handlers: Handlers = {
   },
   contextMenu: (win, items) =>
     new Promise((resolve) => {
+      // Modo captura: el menú nativo no sale en la captura; se registra y se elige la opción que contenga el texto dado
+      const pick = snapshotPath ? process.env.CODYKEN_SNAPSHOT_MENU : undefined
+      if (pick !== undefined) {
+        const flat = (list: MenuItemSpec[]): MenuItemSpec[] => list.flatMap((i) => [i, ...flat(i.submenu ?? [])])
+        const options = flat(Array.isArray(items) ? items : []).filter((i) => i.type !== 'separator')
+        console.log(`[menu] ${JSON.stringify(options.map((i) => (i.enabled === false ? `(${i.label})` : i.label)))}`)
+        return resolve(options.find((i) => i.enabled !== false && pick && i.label?.includes(pick))?.id ?? null)
+      }
       let done = false
       const finish = (id: string | null): void => {
         if (done) return
@@ -104,6 +115,13 @@ const handlers: Handlers = {
   getDiff: (_w, r, source, full) => gitOps.getDiff(repo(r), source, full),
   readWorkingFile: (_w, r, path) => gitOps.readWorkingFile(repo(r), path),
   getLastCommitMessage: (_w, r) => gitOps.getLastCommitMessage(repo(r)),
+  compareRefs: (_w, r, base, target) => gitOps.compareRefs(repo(r), base, target),
+  getRebaseCommits: (_w, r, base, mode, tip) => gitOps.getRebaseCommits(repo(r), base, mode === 'onto' ? 'onto' : 'from', typeof tip === 'string' ? tip : 'HEAD'),
+  divergence: (_w, r, a, b) => gitOps.divergence(repo(r), a, b),
+  getConflictVersions: (_w, r, path) => gitOps.getConflictVersions(repo(r), path),
+  getWorktrees: (_w, r) => gitOps.getWorktrees(repo(r)),
+  getLfsInfo: (_w, r) => gitOps.getLfsInfo(repo(r)),
+  getPullRequests: (_w, r) => getPullRequests(repo(r)),
 
   stage: (_w, r, paths) => gitOps.stage(repo(r), paths),
   stageAll: (_w, r) => gitOps.stageAll(repo(r)),
@@ -114,6 +132,7 @@ const handlers: Handlers = {
   applyPatch: (_w, r, patch, cached, reverse) => gitOps.applyPatch(repo(r), patch, cached, reverse),
   resolveConflict: (_w, r, path, side) => gitOps.resolveConflict(repo(r), path, side),
   commit: (_w, r, message, amend) => gitOps.commit(repo(r), message, amend),
+  saveConflictResolution: (_w, r, path, content) => gitOps.saveConflictResolution(repo(r), path, String(content)),
 
   checkout: (_w, r, target) => gitOps.checkout(repo(r), target),
   createBranch: (_w, r, name, start, checkout) => gitOps.createBranch(repo(r), name, start, checkout),
@@ -122,15 +141,34 @@ const handlers: Handlers = {
   deleteRemoteBranch: (_w, r, remote, branch) => gitOps.deleteRemoteBranch(repo(r), remote, branch),
   merge: (_w, r, ref) => gitOps.merge(repo(r), ref),
   rebase: (_w, r, onto) => gitOps.rebase(repo(r), onto),
+  interactiveRebase: (_w, r, base, steps, mode) => gitOps.interactiveRebase(repo(r), base, Array.isArray(steps) ? steps : [], mode === 'onto' ? 'onto' : 'from'),
+  fastForward: (_w, r, branch, to) => gitOps.fastForward(repo(r), branch, to),
+  moveBranch: (_w, r, branch, to) => gitOps.moveBranch(repo(r), branch, to),
   cherryPick: (_w, r, hash, isMerge) => gitOps.cherryPick(repo(r), hash, isMerge),
   revert: (_w, r, hash, isMerge) => gitOps.revert(repo(r), hash, isMerge),
   reset: (_w, r, hash, mode) => gitOps.reset(repo(r), hash, mode),
   createTag: (_w, r, name, hash, message) => gitOps.createTag(repo(r), name, hash, message),
   deleteTag: (_w, r, name) => gitOps.deleteTag(repo(r), name),
 
-  fetch: (_w, r) => gitOps.fetch(repo(r)),
+  fetch: (_w, r, options) => gitOps.fetch(repo(r), { updateCurrent: options?.updateCurrent === true }),
   pull: (_w, r, mode) => gitOps.pull(repo(r), mode),
   push: (_w, r, force) => gitOps.push(repo(r), force),
+  pushBranch: (_w, r, branch, remote, remoteBranch, options) =>
+    gitOps.pushBranch(repo(r), branch, remote, remoteBranch, { force: options?.force === true, setUpstream: options?.setUpstream === true }),
+
+  addWorktree: async (_w, r, path, branch, newBranch) => remember(await gitOps.addWorktree(repo(r), path, branch, !!newBranch)),
+  removeWorktree: (_w, r, path, force) => gitOps.removeWorktree(repo(r), path, !!force),
+  pruneWorktrees: (_w, r) => gitOps.pruneWorktrees(repo(r)),
+
+  lfsTrack: (_w, r, pattern) => gitOps.lfsTrack(repo(r), pattern),
+  lfsUntrack: (_w, r, pattern) => gitOps.lfsUntrack(repo(r), pattern),
+  lfsPull: (_w, r) => gitOps.lfsPull(repo(r)),
+
+  checkoutPullRequest: (_w, r, number) => checkoutPullRequest(repo(r), Number(number)),
+  openExternal: async (_w, url) => {
+    if (typeof url !== 'string' || !/^https:\/\/[^\s]+$/.test(url)) throw new gitOps.GitError('Solo se abren enlaces https')
+    await shell.openExternal(url)
+  },
 
   stashPush: (_w, r, message) => gitOps.stashPush(repo(r), message),
   stashApply: (_w, r, index, pop) => gitOps.stashApply(repo(r), index, pop),

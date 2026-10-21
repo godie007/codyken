@@ -6,14 +6,14 @@
 
 **Cliente Git de escritorio, rápido y visual, con tema oscuro Monokai.**
 
-Historial en gráfico, staging por línea, ramas locales y remotas lado a lado y deshacer con ⌘Z.<br/>
+Historial en gráfico, staging por línea, arrastrar y soltar ramas, rebase interactivo y deshacer/rehacer con ⌘Z / ⇧⌘Z.<br/>
 Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales, mismos hooks.
 
 ![Electron](https://img.shields.io/badge/Electron-44-2b2e3a?logo=electron&logoColor=9feaf9)
 ![React](https://img.shields.io/badge/React-19-2b2e3a?logo=react&logoColor=61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-2b2e3a?logo=typescript&logoColor=3178c6)
 ![Plataforma](https://img.shields.io/badge/plataforma-macOS-2b2e3a?logo=apple&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-26%20en%20verde-a6e22e)
+![Tests](https://img.shields.io/badge/tests-66%20en%20verde-a6e22e)
 
 [Características](#-características) · [Empezar](#-empezar) · [Atajos](#️-atajos) · [Arquitectura](#️-arquitectura) · [Documentación](#-documentación)
 
@@ -29,7 +29,8 @@ Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales,
 |---|---|
 | 🌳 **Gráfico legible** | Orden cronológico, rama actual siempre en la primera columna y carriles cortos aunque haya decenas de ramas de despliegue. |
 | ✂️ **Commits precisos** | Prepara archivos, bloques o líneas sueltas con un clic; diff con resaltado de sintaxis. |
-| 🔁 **Sin miedo a equivocarte** | Deshacer (⌘Z) para commits, merges, rebases, pulls, checkouts y ramas borradas. |
+| 🖱️ **Arrastra y suelta** | Suelta una rama sobre otra o sobre su remota: fast-forward, merge, rebase, push o pull request. |
+| 🔁 **Sin miedo a equivocarte** | Deshacer (⌘Z) y rehacer (⇧⌘Z) para commits, merges, rebases, pulls, checkouts y ramas borradas. |
 | 🗂️ **Todos tus repos a mano** | Lista de repositorios recientes con búsqueda (⇧⌘O) y pestañas que se restauran al abrir. |
 | 🔒 **Seguro por diseño** | Renderer aislado, una sola API con lista cerrada y git ejecutado sin shell ni prompts de credenciales. |
 
@@ -38,11 +39,48 @@ Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales,
 ### Gráfico de commits
 
 - Cada commit muestra las **iniciales del autor**; los merges son un punto y HEAD lleva un anillo.
-- Las **etiquetas de rama** se unen a su commit con una línea del color del carril. Local y remota juntas cuando coinciden (💻 ☁); las que solo están en el remoto, punteadas.
+- Las **etiquetas de rama** se unen a su commit con una línea del color del carril. Si la local y su remota están en el mismo commit son **una sola etiqueta** (💻 ☁); si difieren, dos; las que solo están en el remoto, punteadas.
 - Fila **`// WIP`** con el conteo de cambios, donde puedes escribir el resumen del commit.
 - Los **stashes** aparecen como nodos cuadrados colgados del commit donde se guardaron.
 - Búsqueda por mensaje, autor o SHA (⌘F), columnas configurables, carga por páginas de 2000 commits y lista virtualizada.
-- **Arrastra** una rama sobre otra para hacer merge o rebase.
+- **⌘‑clic** en otro commit para compararlo con el seleccionado.
+
+### Arrastrar y soltar ramas
+
+Arrastra cualquier rama —local o remota, desde el gráfico o desde el panel izquierdo— y suéltala sobre otra. El menú solo ofrece lo que tiene sentido según cómo estén las dos ramas:
+
+| Arrastras… | …y sueltas sobre | Opciones |
+|---|---|---|
+| una rama local | otra rama local | Fast-forward (si es directo), merge en ella, rebase encima de ella, rebase interactivo |
+| una rama local | su remota u otra remota | Push (o push forzado con `--force-with-lease` si divergen), rebase sobre la remota |
+| una rama remota | una rama local | Fast-forward de la local, merge o rebase de la local sobre la remota |
+| una rama local | el remoto (`origin`) en el panel | Publicarla allí y dejarla siguiendo a la remota |
+| cualquiera | otra rama de GitHub/GitLab | Crear el pull request de una a otra (la sube antes si hace falta) |
+
+Las operaciones locales se deshacen con ⌘Z. La rama que recibe la acción se marca mientras la arrastras.
+
+![Arrastrando deploy/staging sobre origin/deploy/staging: la etiqueta de destino se marca con un borde punteado](codyken-obsidian/Adjuntos/capturas/arrastrar.png)
+
+### Rebase interactivo
+
+Desde un commit (*Rebase interactivo desde aquí…*) o arrastrando una rama sobre otra (*Rebase interactivo de X sobre Y…*): reordena arrastrando las filas, y elige para cada commit **conservar, reescribir el mensaje, combinar con el anterior (con o sin su mensaje) o descartar**. Guarda los cambios sin confirmar en un stash automático y se deshace con ⌘Z.
+
+<table>
+  <tr>
+    <td width="50%"><img src="codyken-obsidian/Adjuntos/capturas/rebase.png" alt="Rebase interactivo con un commit movido y combinado y otro con el mensaje reescrito" /></td>
+    <td width="50%"><img src="codyken-obsidian/Adjuntos/capturas/rebase-sobre.png" alt="Rebase interactivo de feature/pagos sobre deploy/staging abierto al soltar una rama sobre otra" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Reordenar, combinar y reescribir en la misma rama</sub></td>
+    <td align="center"><sub>Llevar una rama encima de otra</sub></td>
+  </tr>
+</table>
+
+### Comparar dos commits o ramas
+
+Selecciona un commit y haz **⌘‑clic** en otro, o usa *Comparar con HEAD* (en un commit) o *Comparar con* la rama actual (en una rama) del menú contextual. El panel derecho muestra los commits que tiene cada lado y los archivos que difieren; cada archivo abre su diff entre los dos puntos. **⇄** invierte los lados y Esc cierra la comparación.
+
+![Comparación entre hotfix/titulo y un commit de main: commits de cada lado y archivos distintos](codyken-obsidian/Adjuntos/capturas/comparar.png)
 
 ### Repositorios recientes
 
@@ -76,6 +114,7 @@ Cada repo que abres, clonas o creas queda en una lista (hasta 50) para volver a 
 
 - El **ojo** junto a cada rama, carpeta o remoto la quita del gráfico; una rama local se oculta junto con su remota para que sus commits desaparezcan de verdad. También existe **Mostrar solo esta rama**.
 - En el panel izquierdo: ☁ si la rama está al día con su remota, `↑n` / `↓n` si difiere, `local` si nunca se subió y 💻 en las remotas que también tienes en local.
+- Una rama que está igual en local y en el remoto aparece **una sola vez** (en Local, con ☁); en Remoto solo quedan las que difieren o no tienes, y las iguales se agrupan en *n iguales a su rama local*.
 - El filtro se guarda por repositorio y se avisa en la búsqueda, en el panel y en la barra de estado.
 
 <table>
@@ -101,20 +140,35 @@ Cada repo que abres, clonas o creas queda en una lista (hasta 50) para volver a 
   </tr>
 </table>
 
-### Deshacer
+### Deshacer y rehacer
 
-**Deshacer** (⌘Z) revierte commit, amend, checkout, crear/eliminar/renombrar rama, etiquetas, merge, rebase, pull, cherry-pick, revert y reset. El tooltip dice qué se va a deshacer.
+**Deshacer** (⌘Z) revierte commit, amend, checkout, crear/eliminar/renombrar rama, etiquetas, merge, rebase (también el interactivo), fast-forward, pull, cherry-pick, revert y reset. **Rehacer** (⇧⌘Z) vuelve a aplicar lo deshecho; una acción nueva vacía la pila de rehacer. Los tooltips dicen qué se va a deshacer o rehacer.
+
+![Barra con Rehacer activo y el aviso "Deshecho: Rebase interactivo de main"](codyken-obsidian/Adjuntos/capturas/rehacer.png)
 
 - Solo actúa si HEAD sigue donde lo dejó la acción: si cambiaste algo desde la terminal, avisa y no toca nada.
 - Deshacer un commit devuelve los cambios a preparados y recupera el mensaje.
 - Lo que requiere `reset --hard` pide confirmación y un árbol de trabajo limpio.
 
-### Remotos y conflictos
+### Remotos
 
-- **Fetch** de todos los remotos (también automático cada 10 minutos).
+- **Fetch** de todos los remotos (también automático cada 10 minutos) que, además, **adelanta las ramas locales que solo estaban atrasadas** hasta su remota (`git fetch` por sí solo nunca las mueve). La rama actual se adelanta al pulsar Fetch si tus cambios sin confirmar lo permiten. No se tocan las que tienen commits propios: el aviso dice cuáles necesitan pull. Si el clon era superficial, trae la historia completa. Se deshace con ⌘Z.
 - **Pull** en tres modos — fast-forward si es posible, solo fast-forward o rebase — con modo predeterminado configurable.
 - **Push** que crea la rama remota si falta y, si el remoto la rechaza, ofrece `--force-with-lease`.
-- Merge, rebase o cherry-pick con conflictos: aviso con **Abortar / Continuar** y resolución por archivo (*Usar versión HEAD*, *Usar versión entrante*, *Marcar resuelto*).
+
+![Aviso tras Fetch: dev adelantada hasta su remota y main con commits propios y del remoto](codyken-obsidian/Adjuntos/capturas/fetch.png)
+
+### Editor de conflictos de tres paneles
+
+Con un merge, rebase o cherry-pick en conflicto, el archivo se abre con **tu versión (HEAD) y la entrante** lado a lado y alineadas, y el **resultado** debajo. Marca en cada conflicto qué lado usar (o los dos, en el orden en que los marques, o ninguno); los tramos iguales largos se pliegan. *Siguiente* salta al próximo pendiente, *Todo HEAD* / *Todo entrante* resuelven de golpe y *Editar a mano* convierte el resultado en texto libre. *Guardar y resolver* escribe el archivo y lo prepara.
+
+![Editor de conflictos: HEAD y entrante arriba, el resultado con la versión entrante elegida abajo](codyken-obsidian/Adjuntos/capturas/conflictos.png)
+
+### Pull requests, worktrees y Git LFS
+
+- **Pull requests / merge requests** de GitHub y GitLab en el panel izquierdo (con `gh` o `glab` iniciados): ver, abrir en el navegador, comparar con su base y hacer checkout. *Crear pull request…* abre la página del proveedor con la rama ya elegida.
+- **Worktrees**: lista, crear uno nuevo para una rama (se abre en otra pestaña), quitar y limpiar los que ya no existen.
+- **Git LFS**: patrones seguidos, archivos sin descargar con *Descargar*, y seguir o dejar de seguir tipos de archivo. Si el repo usa LFS y `git-lfs` no está instalado, lo avisa.
 
 ### Paleta de comandos
 
@@ -138,7 +192,7 @@ npm run dev
 | `npm run dev` | App con recarga en caliente del renderer |
 | `npm run build` | Compila main, preload y renderer a `out/` |
 | `npm start` | Abre la versión compilada |
-| `npm test` | Tests con vitest: gráfico, diffs, staging parcial, git real y lista de recientes |
+| `npm test` | Tests con vitest: gráfico, diffs, staging parcial, conflictos, arrastrar y soltar, rebase, worktrees y git real |
 | `npm run typecheck` | TypeScript estricto en los dos proyectos (node y web) |
 
 <details>
@@ -151,7 +205,7 @@ npx electron-vite build
 CODYKEN_SNAPSHOT=foto.png CODYKEN_OPEN=/ruta/repo npx electron .
 ```
 
-Opcionales: `CODYKEN_SNAPSHOT_JS` (script que se ejecuta antes de la foto), `CODYKEN_SNAPSHOT_DELAY` y `CODYKEN_SNAPSHOT_SETTLE` (esperas en ms).
+Opcionales: `CODYKEN_SNAPSHOT_JS` (script que se ejecuta antes de la foto), `CODYKEN_SNAPSHOT_DELAY` y `CODYKEN_SNAPSHOT_SETTLE` (esperas en ms), `CODYKEN_SNAPSHOT_CONFIRM=1` (acepta los diálogos de confirmación) y `CODYKEN_SNAPSHOT_MENU=texto` (elige la opción de menú que contenga ese texto e imprime las opciones en la consola).
 
 </details>
 
@@ -163,11 +217,12 @@ Opcionales: `CODYKEN_SNAPSHOT_JS` (script que se ejecuta antes de la foto), `COD
 | Repositorios recientes | ⇧⌘O | | Preparar todo y commit | ⇧⌘Enter |
 | Abrir repositorio | ⌘O | | Preparar / quitar todo | ⇧⌘S / ⇧⌘U |
 | Buscar commits | ⌘F | | Escribir mensaje de commit | ⇧⌘M |
-| Filtrar ramas | ⌥⌘F | | Deshacer la última acción | ⌘Z |
+| Filtrar ramas | ⌥⌘F | | Deshacer / rehacer | ⌘Z / ⇧⌘Z |
 | Nueva rama | ⌘B | | Panel izquierdo / derecho | ⌘J / ⌘K |
 | Fetch | ⌘L | | Moverse por el gráfico | ↑ ↓ · J K |
 | Nueva pestaña / cerrar | ⌘T / ⌘W | | Preparar / quitar archivo abierto | S / U |
-| Ir a la pestaña N | ⌘1 … ⌘9 | | Cerrar diff, historial o blame | Esc |
+| Ir a la pestaña N | ⌘1 … ⌘9 | | Cerrar diff, historial, blame o comparación | Esc |
+| Comparar con el seleccionado | ⌘‑clic | | Arrastrar rama sobre rama o remoto | menú de acciones |
 
 ## 🏗️ Arquitectura
 
@@ -180,10 +235,10 @@ Opcionales: `CODYKEN_SNAPSHOT_JS` (script que se ejecuta antes de la foto), `COD
 ```
 
 ```
-src/main/          proceso principal: git.ts (todas las operaciones), watcher, ajustes, IPC
+src/main/          proceso principal: git.ts (todas las operaciones), integrations.ts (gh/glab), watcher, ajustes, IPC
 src/preload/       puente seguro (contextIsolation + sandbox)
 src/shared/        tipos, contrato de la API y reglas compartidas
-src/renderer/      React: components/ (vistas) y lib/ (gráfico, diff, parches, resaltado, búsqueda)
+src/renderer/      React: components/ (vistas) y lib/ (gráfico, diff, parches, conflictos, arrastrar y soltar, búsqueda)
 tests/             vitest
 codyken-obsidian/  documentación completa (bóveda de Obsidian) y capturas
 ```
@@ -199,9 +254,10 @@ La documentación técnica completa vive en la bóveda de Obsidian [`codyken-obs
 - [x] Gráfico con carriles, stashes y ramas locales/remotas
 - [x] Staging por línea, historial, blame y deshacer
 - [x] Lista de repositorios recientes con búsqueda y limpieza
-- [ ] Rehacer y rebase interactivo
-- [ ] Comparar dos commits o ramas
+- [x] Rehacer y rebase interactivo
+- [x] Comparar dos commits o ramas
+- [x] Arrastrar y soltar ramas: fast-forward, merge, rebase, push y pull requests
+- [x] Pull requests de GitHub/GitLab, worktrees y LFS
+- [x] Editor de conflictos de tres paneles
 - [ ] Terminal integrada
 - [ ] Empaquetado `.dmg` firmado
-- [ ] Pull requests de GitHub/GitLab, worktrees y LFS
-- [ ] Editor de conflictos de tres paneles

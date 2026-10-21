@@ -30,7 +30,7 @@ aliases:
 |---|---|
 | Nuevo en Codyken | [[01 - Arquitectura/Visión General\|Visión General]] · [[04 - Interfaz/Distribución de la Ventana\|Distribución de la ventana]] · [[Glosario]] |
 | Desarrollador | [[Desarrollo]] · [[01 - Arquitectura/Stack Tecnológico\|Stack]] · [[01 - Arquitectura/Procesos e IPC\|Procesos e IPC]] · [[02 - Capa Git/Ejecución de git\|Capa Git]] |
-| Quien usa la app | [[05 - Flujos de Trabajo/Commit por Líneas\|Commit por líneas]] · [[05 - Flujos de Trabajo/Sincronizar con el Remoto\|Sincronizar]] · [[04 - Interfaz/Paleta y Atajos\|Atajos]] |
+| Quien usa la app | [[05 - Flujos de Trabajo/Commit por Líneas\|Commit por líneas]] · [[05 - Flujos de Trabajo/Sincronizar con el Remoto\|Sincronizar]] · [[05 - Flujos de Trabajo/Arrastrar y Soltar Ramas\|Arrastrar y soltar]] · [[04 - Interfaz/Paleta y Atajos\|Atajos]] |
 | QA | [[06 - QA y Tests/Suite de Tests\|Suite de tests]] · [[06 - QA y Tests/Modo Captura\|Modo captura]] · [[06 - QA y Tests/Verificación Visual\|Verificación visual]] |
 
 ## 🏛️ 01 — Arquitectura
@@ -45,7 +45,7 @@ aliases:
 
 - [[02 - Capa Git/Ejecución de git|Ejecución de git]] — cómo se lanza `git`, entorno y validación de argumentos
 - [[02 - Capa Git/Lectura del Repositorio|Lectura del repositorio]] — log, refs, estado, status, stashes, diff, historial, blame
-- [[02 - Capa Git/Operaciones de Escritura|Operaciones de escritura]] — staging, commit, ramas, remotos, stash, conflictos
+- [[02 - Capa Git/Operaciones de Escritura|Operaciones de escritura]] — staging, commit, ramas, rebase interactivo, push de una rama, worktrees, LFS, stash, conflictos
 - [[02 - Capa Git/Vigilancia y Refresco|Vigilancia y refresco]] — `fs.watch` y recarga de datos
 - [[02 - Capa Git/Ajustes Persistentes|Ajustes persistentes]] — `settings.json`
 
@@ -56,7 +56,7 @@ aliases:
 - [[03 - Algoritmos/Stashes en el Gráfico|Stashes en el gráfico]]
 - [[03 - Algoritmos/Filtro de Ramas|Filtro de ramas]]
 - [[03 - Algoritmos/Diff y Staging Parcial|Diff y staging parcial]]
-- [[03 - Algoritmos/Pila de Deshacer|Pila de deshacer]]
+- [[03 - Algoritmos/Pila de Deshacer|Pila de deshacer y rehacer]]
 
 ## 🎨 04 — Interfaz
 
@@ -74,9 +74,14 @@ aliases:
 - [[05 - Flujos de Trabajo/Commit por Líneas|Commit por líneas]]
 - [[05 - Flujos de Trabajo/Sincronizar con el Remoto|Sincronizar con el remoto]]
 - [[05 - Flujos de Trabajo/Ramas y Merge|Ramas, merge y rebase]]
-- [[05 - Flujos de Trabajo/Resolver Conflictos|Resolver conflictos]]
+- [[05 - Flujos de Trabajo/Arrastrar y Soltar Ramas|Arrastrar y soltar ramas]] — fast-forward, merge, rebase, push y PR soltando una rama sobre otra
+- [[05 - Flujos de Trabajo/Rebase Interactivo|Rebase interactivo]]
+- [[05 - Flujos de Trabajo/Comparar Commits y Ramas|Comparar commits y ramas]]
+- [[05 - Flujos de Trabajo/Resolver Conflictos|Resolver conflictos]] — editor de tres paneles
+- [[05 - Flujos de Trabajo/Pull Requests|Pull requests]] — GitHub y GitLab
+- [[05 - Flujos de Trabajo/Worktrees y LFS|Worktrees y LFS]]
 - [[05 - Flujos de Trabajo/Trabajar con Stashes|Trabajar con stashes]]
-- [[05 - Flujos de Trabajo/Deshacer una Acción|Deshacer una acción]]
+- [[05 - Flujos de Trabajo/Deshacer una Acción|Deshacer y rehacer]]
 
 ## 🧪 06 — QA y tests
 

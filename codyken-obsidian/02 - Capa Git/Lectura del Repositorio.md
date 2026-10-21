@@ -33,6 +33,12 @@ related:
 | `getFileHistory(path, 500)` | `log --follow -M --name-status` | `FileHistoryEntry[]` siguiendo renombres |
 | `getBlame(path, rev)` | `blame --porcelain [rev] --` | `BlameLine[]` |
 | `getLastCommitMessage` | `log -1 --format=%B` | Para precargar el amend |
+| `compareRefs(base, destino)` | `rev-list --left-right --count`, `diff --name-status -z -M`, `log -n 200` de cada lado, `merge-base` | `Comparison` ([[05 - Flujos de Trabajo/Comparar Commits y Ramas]]) |
+| `divergence(a, b)` | `rev-list --left-right --count a...b --` | `{ ahead, behind }`: commits que solo tiene cada lado; lo usa [[05 - Flujos de Trabajo/Arrastrar y Soltar Ramas\|arrastrar y soltar]] |
+| `getRebaseCommits(base, modo, tip)` | `log --reverse` del rango (`padre..HEAD` o `--cherry-pick --right-only base...tip`) | `RebaseCommit[]`; rechaza merges y más de 500 ([[05 - Flujos de Trabajo/Rebase Interactivo]]) |
+| `getConflictVersions(path)` | `show :1:path`, `:2:`, `:3:` + archivo de trabajo | `ConflictVersions` (base, HEAD, entrante, binario) |
+| `getWorktrees` | `worktree list --porcelain` | `Worktree[]` (`parseWorktrees`) |
+| `getLfsInfo` | `lfs version`, `lfs track`, `lfs ls-files --long`; sin git-lfs, lee `.gitattributes` | `LfsInfo` |
 
 ## Log y orden
 

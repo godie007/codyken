@@ -108,7 +108,7 @@ export type DiffSource =
   | { kind: 'unstaged'; path: string; status: FileStatus }
   | { kind: 'staged'; path: string; oldPath?: string; status: FileStatus }
   | { kind: 'conflict'; path: string }
-  | { kind: 'commit'; hash: string; parent: string | null; path: string; oldPath?: string; status: FileStatus }
+  | { kind: 'commit'; hash: string; parent: string | null; path: string; oldPath?: string; status: FileStatus; label?: string }
 
 export type PullMode = 'merge' | 'ff-only' | 'rebase'
 export type ResetMode = 'soft' | 'mixed' | 'hard'
@@ -119,6 +119,112 @@ export type CheckoutTarget =
   | { kind: 'local'; name: string }
   | { kind: 'remote'; name: string }
   | { kind: 'commit'; hash: string }
+
+export interface Comparison {
+  /** SHA completos de los dos extremos */
+  base: string
+  target: string
+  mergeBase: string | null
+  files: FileChange[]
+  /** Commits que están en target y no en base (los más nuevos primero, como máximo 200) */
+  ahead: Commit[]
+  /** Commits que están en base y no en target */
+  behind: Commit[]
+  aheadCount: number
+  behindCount: number
+}
+
+export type RebaseAction = 'pick' | 'reword' | 'squash' | 'fixup' | 'drop'
+
+/** `from`: reescribe desde un commit de la rama actual · `onto`: lleva los commits de la rama encima de otra */
+export type RebaseMode = 'from' | 'onto'
+
+export interface Divergence {
+  /** Commits del primero que no tiene el segundo */
+  ahead: number
+  behind: number
+}
+
+export interface RebaseCommit {
+  hash: string
+  author: string
+  email: string
+  date: number
+  subject: string
+  message: string
+}
+
+export interface RebaseStep {
+  hash: string
+  action: RebaseAction
+  /** Mensaje nuevo para reword */
+  message?: string
+}
+
+export interface ConflictVersions {
+  /** Contenido del archivo en el árbol de trabajo, con los marcadores de conflicto */
+  working: string
+  base: string | null
+  ours: string | null
+  theirs: string | null
+  binary: boolean
+}
+
+/** Lo que hizo un fetch además de traer las ramas remotas */
+export interface FetchResult {
+  /** Ramas locales que solo estaban atrasadas y se adelantaron (fast-forward) hasta su remota */
+  updated: { branch: string; from: string; to: string; current: boolean }[]
+  /** Tienen commits propios y del remoto a la vez: necesitan merge o rebase */
+  diverged: string[]
+  /** Atrasadas que no se tocaron, con el motivo */
+  skipped: { branch: string; reason: string }[]
+  /** El repo era un clon superficial y se trajo la historia completa */
+  unshallowed: boolean
+}
+
+export interface Worktree {
+  path: string
+  head: string | null
+  branch: string | null
+  detached: boolean
+  bare: boolean
+  locked: boolean
+  prunable: boolean
+  isMain: boolean
+}
+
+export interface LfsInfo {
+  installed: boolean
+  version: string | null
+  patterns: { pattern: string; source: string }[]
+  files: { path: string; oid: string; downloaded: boolean }[]
+}
+
+export type PrProvider = 'github' | 'gitlab'
+
+export interface PullRequest {
+  number: number
+  title: string
+  author: string
+  head: string
+  base: string
+  url: string
+  draft: boolean
+  updatedAt: number
+}
+
+export interface PullRequestInfo {
+  provider: PrProvider | null
+  /** owner/nombre (o grupo/subgrupo/nombre en GitLab) */
+  slug: string | null
+  /** Remoto del que salen el proveedor y los PRs (normalmente origin) */
+  remote: string | null
+  webUrl: string | null
+  /** La CLI (gh o glab) no está instalada o no ha iniciado sesión */
+  cliMissing: boolean
+  error: string | null
+  items: PullRequest[]
+}
 
 export interface RecentRepo {
   path: string
@@ -197,6 +303,13 @@ export interface Api {
   getDiff(repo: string, source: DiffSource, full: boolean): Promise<string>
   readWorkingFile(repo: string, path: string): Promise<string>
   getLastCommitMessage(repo: string): Promise<string>
+  compareRefs(repo: string, base: string, target: string): Promise<Comparison>
+  getRebaseCommits(repo: string, base: string, mode?: RebaseMode, tip?: string): Promise<RebaseCommit[]>
+  divergence(repo: string, a: string, b: string): Promise<Divergence>
+  getConflictVersions(repo: string, path: string): Promise<ConflictVersions>
+  getWorktrees(repo: string): Promise<Worktree[]>
+  getLfsInfo(repo: string): Promise<LfsInfo>
+  getPullRequests(repo: string): Promise<PullRequestInfo>
 
   stage(repo: string, paths: string[]): Promise<void>
   stageAll(repo: string): Promise<void>
@@ -207,6 +320,7 @@ export interface Api {
   applyPatch(repo: string, patch: string, cached: boolean, reverse: boolean): Promise<void>
   resolveConflict(repo: string, path: string, side: 'ours' | 'theirs'): Promise<void>
   commit(repo: string, message: string, amend: boolean): Promise<void>
+  saveConflictResolution(repo: string, path: string, content: string): Promise<void>
 
   checkout(repo: string, target: CheckoutTarget): Promise<void>
   createBranch(repo: string, name: string, start: string, checkout: boolean): Promise<void>
@@ -215,15 +329,31 @@ export interface Api {
   deleteRemoteBranch(repo: string, remote: string, branch: string): Promise<void>
   merge(repo: string, ref: string): Promise<void>
   rebase(repo: string, onto: string): Promise<void>
+  interactiveRebase(repo: string, base: string, steps: RebaseStep[], mode?: RebaseMode): Promise<void>
+  fastForward(repo: string, branch: string, to: string): Promise<void>
+  moveBranch(repo: string, branch: string, to: string): Promise<void>
   cherryPick(repo: string, hash: string, isMerge: boolean): Promise<void>
   revert(repo: string, hash: string, isMerge: boolean): Promise<void>
   reset(repo: string, hash: string, mode: ResetMode): Promise<void>
   createTag(repo: string, name: string, hash: string, message: string): Promise<void>
   deleteTag(repo: string, name: string): Promise<void>
 
-  fetch(repo: string): Promise<void>
+  /** updateCurrent: adelantar también la rama actual (fast-forward, sin tocar cambios locales) */
+  fetch(repo: string, options?: { updateCurrent?: boolean }): Promise<FetchResult>
   pull(repo: string, mode: PullMode): Promise<void>
   push(repo: string, force: boolean): Promise<void>
+  pushBranch(repo: string, branch: string, remote: string, remoteBranch: string, options: { force?: boolean; setUpstream?: boolean }): Promise<void>
+
+  addWorktree(repo: string, path: string, branch: string, newBranch: boolean): Promise<string>
+  removeWorktree(repo: string, path: string, force: boolean): Promise<void>
+  pruneWorktrees(repo: string): Promise<void>
+
+  lfsTrack(repo: string, pattern: string): Promise<void>
+  lfsUntrack(repo: string, pattern: string): Promise<void>
+  lfsPull(repo: string): Promise<void>
+
+  checkoutPullRequest(repo: string, number: number): Promise<void>
+  openExternal(url: string): Promise<void>
 
   stashPush(repo: string, message: string): Promise<void>
   stashApply(repo: string, index: number, pop: boolean): Promise<void>

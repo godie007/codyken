@@ -33,7 +33,7 @@ Barra superior: icono de estado, ruta, origen ("Sin preparar", "Preparado", "Com
 
 ### Conflictos
 
-El archivo se muestra con los marcadores `<<<<<<<`, `=======`, `>>>>>>>` y las zonas *nuestra* / *base* / *entrante* coloreadas, con **Usar versión HEAD** (`checkout --ours`), **Usar versión entrante** (`--theirs`) y **Marcar resuelto** (`add`). Ver [[05 - Flujos de Trabajo/Resolver Conflictos]].
+Un archivo en conflicto no abre el diff sino el **editor de tres paneles** (`MergeEditor.tsx`): HEAD y entrante arriba, alineados, y el resultado abajo, con casillas por conflicto, *Todo HEAD / Todo entrante*, *Editar a mano* y **Guardar y resolver**. Si es binario o los marcadores no se pueden leer, ofrece **Usar versión HEAD** (`checkout --ours`) o **Usar versión entrante** (`--theirs`). Ver [[05 - Flujos de Trabajo/Resolver Conflictos]].
 
 ## Historial de un archivo (`FileTools.tsx` → `FileHistory`)
 

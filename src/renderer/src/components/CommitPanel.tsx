@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { CommitDetail, DiffSource, FileChange, RepoState, StashEntry, WorkingStatus } from '../../../shared/types'
+import type { Commit, CommitDetail, Comparison, DiffSource, FileChange, RepoState, StashEntry, WorkingStatus } from '../../../shared/types'
 import { api, mod } from '../api'
-import { formatFullDate, shortHash, splitPath } from '../lib/format'
+import { formatFullDate, relativeTime, shortHash, splitPath } from '../lib/format'
 import { buildTree, type TreeNode } from '../lib/refs'
 import { Icon } from './Icons'
 import { Avatar, StatusBadge } from './ui'
 
-export type Selection = { kind: 'wip' } | { kind: 'commit'; hash: string } | { kind: 'stash'; index: number; hash: string } | null
+/** Un extremo de una comparación: el SHA y cómo mostrarlo (nombre de rama o SHA corto) */
+export interface CompareEnd {
+  hash: string
+  label: string
+}
+
+export type Selection =
+  | { kind: 'wip' }
+  | { kind: 'commit'; hash: string }
+  | { kind: 'stash'; index: number; hash: string }
+  | { kind: 'compare'; base: CompareEnd; target: CompareEnd }
+  | null
 
 export interface CommitDraft {
   summary: string
@@ -30,6 +41,9 @@ export interface CommitPanelActions {
   stashDrop: (stash: StashEntry) => void
   copy: (text: string, what: string) => void
   fileMenu: (file: FileChange, source: DiffSource) => void
+  /** Cambia de lado los extremos de la comparación */
+  swapCompare: () => void
+  closeCompare: () => void
 }
 
 export interface CommitPanelProps {
@@ -54,6 +68,7 @@ export function CommitPanel(props: CommitPanelProps) {
   const { selection } = props
   if (!selection) return <aside className="right-panel"><div className="empty">Selecciona un commit</div></aside>
   if (selection.kind === 'wip') return <WipPanel {...props} />
+  if (selection.kind === 'compare') return <ComparePanel {...props} base={selection.base} target={selection.target} />
   return <CommitDetailPanel {...props} hash={selection.hash} stash={selection.kind === 'stash' ? props.stashes.find((s) => s.index === selection.index) : undefined} />
 }
 
@@ -396,5 +411,111 @@ function CommitDetailPanel(props: CommitPanelProps & { hash: string; stash?: Sta
         </FileSection>
       </div>
     </aside>
+  )
+}
+
+// ── Comparar dos commits o ramas ────────────────────────────────────────────
+
+const compareCache = new Map<string, Comparison>()
+
+function ComparePanel(props: CommitPanelProps & { base: CompareEnd; target: CompareEnd }) {
+  const { repo, base, target, actions } = props
+  const key = `${repo}:${base.hash}:${target.hash}`
+  const [result, setResult] = useState<Comparison | null>(compareCache.get(key) ?? null)
+  const [error, setError] = useState<string | null>(null)
+  const [openList, setOpenList] = useState<'ahead' | 'behind' | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setError(null)
+    setResult(compareCache.get(key) ?? null)
+    api.compareRefs(repo, base.hash, target.hash).then(
+      (r) => {
+        compareCache.set(key, r)
+        if (alive) setResult(r)
+      },
+      (e: Error) => alive && setError(e.message)
+    )
+    return () => {
+      alive = false
+    }
+  }, [key])
+
+  const label = `${base.label} → ${target.label}`
+  const isActive = (path: string): boolean => props.activeDiff?.kind === 'commit' && props.activeDiff.hash === result?.target && props.activeDiff.parent === result?.base && props.activeDiff.path === path
+
+  return (
+    <aside className="right-panel">
+      <div className="rp-header">
+        <div className="rp-title"><Icon.Compare size={14} /> Comparar</div>
+        <button className="icon-btn" title="Cambiar de lado" onClick={actions.swapCompare}><Icon.Swap size={15} /></button>
+        <button className="icon-btn" title="Terminar la comparación" onClick={actions.closeCompare}><Icon.Close size={15} /></button>
+      </div>
+      <div className="compare-ends">
+        <span className="compare-end mono" title={base.hash}>{base.label}</span>
+        <Icon.ChevronRight size={13} />
+        <span className="compare-end mono target" title={target.hash}>{target.label}</span>
+      </div>
+      {error && <div className="empty">{error}</div>}
+      {!result && !error && <div className="empty">Comparando…</div>}
+      {result && (
+        <div className="rp-scroll">
+          <div className="compare-summary">
+            {result.mergeBase === null && <div className="compare-note"><Icon.Warning size={13} /> No tienen historia en común.</div>}
+            <CompareCount
+              count={result.aheadCount}
+              text={`${result.aheadCount === 1 ? 'commit' : 'commits'} en ${target.label} que no están en ${base.label}`}
+              open={openList === 'ahead'}
+              onToggle={() => setOpenList(openList === 'ahead' ? null : 'ahead')}
+              commits={result.ahead}
+              onSelect={props.onSelectCommit}
+            />
+            <CompareCount
+              count={result.behindCount}
+              text={`${result.behindCount === 1 ? 'commit' : 'commits'} en ${base.label} que no están en ${target.label}`}
+              open={openList === 'behind'}
+              onToggle={() => setOpenList(openList === 'behind' ? null : 'behind')}
+              commits={result.behind}
+              onSelect={props.onSelectCommit}
+            />
+          </div>
+          <FileSection title="Archivos distintos" count={result.files.length} action={<ViewToggle view={props.fileView} onChange={props.onFileView} />}>
+            {result.files.length === 0 && <div className="rp-empty">Los dos tienen el mismo contenido</div>}
+            <FileList
+              files={result.files}
+              view={props.fileView}
+              sourceOf={(f) => ({ kind: 'commit', hash: result.target, parent: result.base, path: f.path, oldPath: f.oldPath, status: f.status, label })}
+              isActive={(f) => isActive(f.path)}
+              onOpen={props.onOpenDiff}
+              onMenu={actions.fileMenu}
+            />
+          </FileSection>
+        </div>
+      )}
+    </aside>
+  )
+}
+
+function CompareCount({ count, text, open, onToggle, commits, onSelect }: { count: number; text: string; open: boolean; onToggle: () => void; commits: Commit[]; onSelect: (hash: string) => void }) {
+  return (
+    <div className="compare-count">
+      <button className="compare-count-row" disabled={count === 0} onClick={onToggle}>
+        {count > 0 ? open ? <Icon.ChevronDown size={12} /> : <Icon.ChevronRight size={12} /> : <span style={{ width: 12 }} />}
+        <strong>{count.toLocaleString('es')}</strong> <span className="muted">{text}</span>
+      </button>
+      {open && (
+        <div className="compare-commits">
+          {commits.map((c) => (
+            <button key={c.hash} className="compare-commit" onClick={() => onSelect(c.hash)} title={`${c.subject}\n${c.author} · ${formatFullDate(c.date)}`}>
+              <Avatar name={c.author} email={c.email} size={18} />
+              <span className="truncate">{c.subject}</span>
+              <span className="muted small mono">{shortHash(c.hash)}</span>
+              <span className="muted small">{relativeTime(c.date)}</span>
+            </button>
+          ))}
+          {count > commits.length && <div className="rp-empty">Y {(count - commits.length).toLocaleString('es')} más…</div>}
+        </div>
+      )}
+    </div>
   )
 }

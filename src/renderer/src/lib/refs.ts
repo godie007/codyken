@@ -10,7 +10,10 @@ export interface RefLabel {
   isHead: boolean
 }
 
-/** Agrupa las referencias por commit; una rama local y su remota con el mismo nombre se muestran juntas. */
+/**
+ * Agrupa las referencias por commit. Si una rama local y su remota están en el mismo commit se muestran
+ * como una sola etiqueta: la remota que sigue (upstream) o, si no sigue ninguna, la que se llama igual.
+ */
 export function labelsByCommit(refs: Ref[], detachedHead: string | null): Map<string, RefLabel[]> {
   const map = new Map<string, RefLabel[]>()
   const list = (hash: string): RefLabel[] => {
@@ -33,7 +36,9 @@ export function labelsByCommit(refs: Ref[], detachedHead: string | null): Map<st
     if (ref.type !== 'remote') continue
     const short = ref.name.slice(ref.name.indexOf('/') + 1)
     const labels = list(ref.hash)
-    const twin = labels.find((l) => l.kind === 'branch' && l.local && l.name === short)
+    const twin =
+      labels.find((l) => l.kind === 'branch' && l.local?.upstream === ref.name) ??
+      labels.find((l) => l.kind === 'branch' && l.local && !l.local.upstream && l.name === short)
     if (twin) twin.remotes.push(ref)
     else labels.push({ key: ref.fullName, kind: 'branch', name: ref.name, remotes: [ref], isHead: false })
   }
@@ -48,12 +53,20 @@ export function labelsByCommit(refs: Ref[], detachedHead: string | null): Map<st
   return map
 }
 
-/** Nombre que entiende git para referirse a la etiqueta (rama local, remota o tag). */
-export function labelRef(label: RefLabel): string {
-  if (label.local) return label.local.name
-  if (label.remotes[0]) return label.remotes[0].name
-  if (label.tag) return label.tag.name
-  return 'HEAD'
+/** Referencia completa de una etiqueta de rama (la local si la hay); es lo que se arrastra. */
+export function labelFullName(label: RefLabel): string | null {
+  return (label.local ?? label.remotes[0])?.fullName ?? null
+}
+
+/** Nombre de la rama dentro de su remoto: `origin/feature/x` → `feature/x` */
+export function remoteBranchName(ref: Ref): string {
+  return ref.remote ? ref.name.slice(ref.remote.length + 1) : ref.name
+}
+
+/** Rama remota que corresponde a una local: la que sigue o, si no sigue ninguna, la que se llama igual en `remote`. */
+export function remoteTwin(local: Ref, refs: Ref[], remote?: string | null): Ref | undefined {
+  if (local.upstream) return refs.find((r) => r.type === 'remote' && r.name === local.upstream)
+  return refs.find((r) => r.type === 'remote' && (!remote || r.remote === remote) && remoteBranchName(r) === local.name)
 }
 
 export interface TreeNode<T> {

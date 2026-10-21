@@ -53,7 +53,27 @@ Todo vive en `src/shared/types.ts`. Las fechas viajan en **milisegundos**.
 | `unstaged` | `path`, `status` | Árbol de trabajo vs índice (o `/dev/null` si es nuevo) |
 | `staged` | `path`, `oldPath?`, `status` | Índice vs HEAD |
 | `conflict` | `path` | El archivo con marcadores, leído del disco |
-| `commit` | `hash`, `parent` (`null` = raíz), `path`, `oldPath?`, `status` | Commit vs su primer padre |
+| `commit` | `hash`, `parent` (`null` = raíz), `path`, `oldPath?`, `status`, `label?` | Commit vs su primer padre; en una comparación, `parent` = base y `label` nombra los dos extremos |
+
+## Comparar, rebase y conflictos
+
+| Tipo | Campos |
+|---|---|
+| `Comparison` | `base`, `target` (SHA completos), `mergeBase`, `files[]`, `ahead[]` / `behind[]` (hasta 200 commits), `aheadCount`, `behindCount` |
+| `Divergence` | `ahead`, `behind`: commits que solo tiene cada una de dos refs |
+| `RebaseMode` | `from` (desde un commit de la rama actual) · `onto` (llevar una rama encima de otra) |
+| `RebaseCommit` | `hash`, `author`, `email`, `date`, `subject`, `message` |
+| `RebaseStep` | `hash`, `action` (`pick` / `reword` / `squash` / `fixup` / `drop`), `message?` (en `reword`) |
+| `ConflictVersions` | `working` (con marcadores), `base`, `ours`, `theirs` (etapas `:1:`/`:2:`/`:3:`, `null` si faltan), `binary` |
+
+## Integraciones
+
+| Tipo | Campos |
+|---|---|
+| `Worktree` | `path`, `head`, `branch`, `detached`, `bare`, `isMain`, `locked`, `prunable` |
+| `LfsInfo` | `installed`, `version`, `patterns[]` (`pattern`, `source`), `files[]` (`oid`, `path`, `downloaded`) |
+| `PullRequestInfo` | `provider` (`github` / `gitlab` / `null`), `slug`, `remote`, `webUrl`, `cliMissing`, `error`, `items[]` |
+| `PullRequest` | `number`, `title`, `author`, `head`, `base`, `url`, `draft`, `updatedAt` |
 
 ## Ajustes
 

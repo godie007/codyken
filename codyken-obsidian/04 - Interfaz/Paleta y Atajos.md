@@ -21,11 +21,12 @@ Búsqueda aproximada (`lib/fuzzy.ts`) sobre:
 
 | Grupo | Elementos |
 |---|---|
-| Repositorio | Fetch, Pull (3 modos), Push, Deshacer (si hay), Abrir en Terminal, Abrir carpeta, Copiar ruta |
-| Rama | Nueva rama… |
+| Repositorio | Fetch, Pull (3 modos), Push, Deshacer: … y Rehacer: … (si hay), Crear pull request de {rama} y Ver pull requests en el navegador (si hay GitHub/GitLab), Abrir en Terminal, Abrir carpeta, Copiar ruta |
+| Rama | Nueva rama…, Rebase interactivo desde abc1234… (con un commit de la rama seleccionado), Nuevo worktree… |
+| LFS | Seguir un tipo de archivo con Git LFS…, Descargar archivos de Git LFS (si git-lfs está instalado) |
 | Stash | Guardar en el stash…, Aplicar el último (pop) |
 | Cambios | Preparar todo, Quitar todo, Escribir mensaje de commit, Descartar todos los cambios… |
-| Ver | Buscar commits, Paneles izquierdo/derecho, Mostrar todas las ramas (si hay filtro) |
+| Ver | Buscar commits, Paneles izquierdo/derecho, Mostrar todas las ramas (si hay filtro), Comparar abc1234 con {rama actual} (con un commit seleccionado) |
 | Checkout | Cada rama local (no la actual) y remota |
 | Ir a | Cada rama: selecciona su commit en el gráfico |
 | Abrir / Pestañas | Repos recientes, Abrir repositorio…, Repositorios recientes… (desplegable), Nueva pestaña |
@@ -45,10 +46,12 @@ Búsqueda aproximada (`lib/fuzzy.ts`) sobre:
 | Escribir mensaje de commit | ⇧⌘M |
 | Commit / preparar todo y commit | ⌘Enter / ⇧⌘Enter |
 | Deshacer la última acción | ⌘Z (fuera de campos de texto) |
+| Rehacer lo último deshecho | ⇧⌘Z (fuera de campos de texto) |
+| Comparar con el commit seleccionado | ⌘‑clic en otro commit |
 | Panel izquierdo / derecho | ⌘J / ⌘K |
 | Moverse por el gráfico | ↑ ↓ o J K |
 | Preparar / quitar el archivo abierto | S / U |
-| Cerrar diff, historial o blame | Esc |
+| Cerrar diff, historial, blame o la comparación | Esc |
 | Abrir repo · nueva pestaña · cerrar pestaña | ⌘O · ⌘T · ⌘W |
 | [[04 - Interfaz/Repositorios Recientes\|Repositorios recientes]] | ⇧⌘O |
 | Ir a la pestaña N · siguiente | ⌘1 … ⌘9 · Ctrl+Tab |

@@ -1,25 +1,34 @@
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { readFile, stat } from 'node:fs/promises'
-import { basename, join, relative, resolve, isAbsolute } from 'node:path'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join, relative, resolve, isAbsolute } from 'node:path'
 import type {
   CheckoutTarget,
   BlameLine,
   Commit,
   CommitDetail,
+  Comparison,
+  ConflictVersions,
   DiffSource,
   FileChange,
   FileHistoryEntry,
+  FetchResult,
   FileStatus,
   GraphFilter,
+  LfsInfo,
   PullMode,
+  RebaseCommit,
+  RebaseMode,
+  RebaseStep,
   Ref,
   Remote,
   RepoOperation,
   RepoState,
   ResetMode,
   StashEntry,
-  WorkingStatus
+  WorkingStatus,
+  Worktree
 } from '../shared/types'
 
 export class GitError extends Error {}
@@ -41,18 +50,20 @@ function buildEnv(): NodeJS.ProcessEnv {
   return env
 }
 
-const ENV = buildEnv()
+export const ENV = buildEnv()
 const FS = '\x1f'
 const RS = '\x1e'
 
 interface RunOptions {
   input?: string
   okCodes?: number[]
+  /** Variables extra para esta llamada */
+  env?: NodeJS.ProcessEnv
 }
 
 export function git(cwd: string, args: string[], options: RunOptions = {}): Promise<string> {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn('git', ['-c', 'core.quotepath=false', '-c', 'color.ui=false', ...args], { cwd, env: ENV })
+    const child = spawn('git', ['-c', 'core.quotepath=false', '-c', 'color.ui=false', ...args], { cwd, env: options.env ? { ...ENV, ...options.env } : ENV })
     const out: Buffer[] = []
     const err: Buffer[] = []
     child.stdout.on('data', (chunk: Buffer) => out.push(chunk))
@@ -151,12 +162,20 @@ export async function getLog(repo: string, limit: number, filter: GraphFilter = 
     if (!(await hasHead(repo))) return []
     throw error
   }
+  return parseLog(out)
+}
+
+function parseLog(out: string): Commit[] {
   const commits: Commit[] = []
   for (const record of out.split(RS)) {
     const line = record.replace(/^\n/, '')
     if (line) commits.push(parseCommitFields(line.split(FS)))
   }
   return commits
+}
+
+export function remoteHost(url: string): string {
+  return url.startsWith('/') || url.startsWith('.') ? 'local' : /^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)/i.exec(url)?.[1] ?? ''
 }
 
 export async function getRemotes(repo: string): Promise<Remote[]> {
@@ -166,8 +185,7 @@ export async function getRemotes(repo: string): Promise<Remote[]> {
     const match = /^(\S+)\s+(\S+)\s+\(fetch\)$/.exec(line)
     if (!match) continue
     const [, name, url] = match
-    const host = /^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)/i.exec(url)?.[1] ?? ''
-    remotes.set(name, { name, url, host: url.startsWith('/') || url.startsWith('.') ? 'local' : host })
+    remotes.set(name, { name, url, host: remoteHost(url) })
   }
   return [...remotes.values()]
 }
@@ -423,6 +441,57 @@ export async function getLastCommitMessage(repo: string): Promise<string> {
   return (await git(repo, ['log', '-1', '--format=%B'])).trimEnd()
 }
 
+// ── Comparar ────────────────────────────────────────────────────────────────
+
+const COMPARE_LIMIT = 200
+
+export async function compareRefs(repo: string, base: string, target: string): Promise<Comparison> {
+  const [b, t] = (await git(repo, ['rev-parse', `${assertArg(base, 'Referencia')}^{commit}`, `${assertArg(target, 'Referencia')}^{commit}`])).trim().split('\n')
+  const [counts, files, ahead, behind, mergeBase] = await Promise.all([
+    git(repo, ['rev-list', '--left-right', '--count', `${b}...${t}`]),
+    git(repo, ['diff', '--name-status', '-z', '-M', b, t]),
+    git(repo, ['log', '-n', String(COMPARE_LIMIT), LOG_FORMAT, `${b}..${t}`, '--']),
+    git(repo, ['log', '-n', String(COMPARE_LIMIT), LOG_FORMAT, `${t}..${b}`, '--']),
+    git(repo, ['merge-base', b, t], { okCodes: [0, 1] })
+  ])
+  const [behindCount, aheadCount] = counts.trim().split(/\s+/).map(Number)
+  return {
+    base: b,
+    target: t,
+    mergeBase: mergeBase.trim() || null,
+    files: parseNameStatus(files),
+    ahead: parseLog(ahead),
+    behind: parseLog(behind),
+    aheadCount,
+    behindCount
+  }
+}
+
+// ── Conflictos ──────────────────────────────────────────────────────────────
+
+async function showStage(repo: string, stage: 1 | 2 | 3, path: string): Promise<string | null> {
+  try {
+    return await git(repo, ['show', `:${stage}:${path}`])
+  } catch {
+    return null // la versión no existe (archivo nuevo o borrado en un lado)
+  }
+}
+
+export async function getConflictVersions(repo: string, path: string): Promise<ConflictVersions> {
+  const working = existsSync(resolve(repo, path)) ? await readWorkingFile(repo, path) : ''
+  const [base, ours, theirs] = await Promise.all([showStage(repo, 1, path), showStage(repo, 2, path), showStage(repo, 3, path)])
+  const binary = [working, ours, theirs].some((text) => !!text && text.slice(0, 8000).includes('\0'))
+  return { working, base, ours, theirs, binary }
+}
+
+export async function saveConflictResolution(repo: string, path: string, content: string): Promise<void> {
+  const target = resolve(repo, path)
+  const rel = relative(repo, target)
+  if (rel.startsWith('..') || isAbsolute(rel)) throw new GitError('Ruta fuera del repositorio')
+  await writeFile(target, content, 'utf8')
+  await git(repo, ['add', '--', rel])
+}
+
 // ── Staging y commits ───────────────────────────────────────────────────────
 
 export async function stage(repo: string, paths: string[]): Promise<void> {
@@ -516,11 +585,161 @@ export async function deleteRemoteBranch(repo: string, remote: string, branch: s
 }
 
 export async function merge(repo: string, ref: string): Promise<void> {
-  await git(repo, ['merge', '--no-edit', assertArg(ref, 'Referencia')])
+  assertArg(ref, 'Referencia')
+  // Con la referencia completa (sin ambigüedad con etiquetas) git pondría "refs/heads/…" en el mensaje: se arma como el suyo
+  const kind = ref.startsWith('refs/heads/') ? 'branch' : ref.startsWith('refs/remotes/') ? 'remote-tracking branch' : null
+  if (!kind) {
+    await git(repo, ['merge', '--no-edit', ref])
+    return
+  }
+  const name = ref.replace(/^refs\/(heads|remotes)\//, '')
+  const into = await currentBranch(repo)
+  const message = `Merge ${kind} '${name}'${into && into !== 'main' && into !== 'master' ? ` into ${into}` : ''}`
+  await git(repo, ['merge', '--no-edit', '-m', message, ref])
 }
 
 export async function rebase(repo: string, onto: string): Promise<void> {
   await git(repo, ['rebase', assertArg(onto, 'Referencia')])
+}
+
+/** Commits que tiene `a` y no `b` (ahead) y al revés (behind). */
+export async function divergence(repo: string, a: string, b: string): Promise<{ ahead: number; behind: number }> {
+  const out = await git(repo, ['rev-list', '--left-right', '--count', `${assertArg(a, 'Referencia')}...${assertArg(b, 'Referencia')}`, '--'])
+  const [ahead, behind] = out.trim().split(/\s+/).map(Number)
+  return { ahead: ahead || 0, behind: behind || 0 }
+}
+
+/** Adelanta `branch` hasta `to` sin crear commits; falla si no es un avance directo. */
+export async function fastForward(repo: string, branch: string, to: string): Promise<void> {
+  await assertBranchName(repo, branch)
+  assertArg(to, 'Referencia')
+  if ((await currentBranch(repo)) === branch) {
+    await git(repo, ['merge', '--ff-only', to])
+    return
+  }
+  try {
+    await git(repo, ['merge-base', '--is-ancestor', `refs/heads/${branch}`, to])
+  } catch {
+    throw new GitError(`${branch} tiene commits que no están en ${to}: no se puede hacer fast-forward.`)
+  }
+  await moveBranch(repo, branch, to)
+}
+
+/** Apunta una rama que no está en uso a otro commit (git se niega si está activa en algún worktree). */
+export async function moveBranch(repo: string, branch: string, to: string): Promise<void> {
+  await assertBranchName(repo, branch)
+  await git(repo, ['branch', '-f', branch, assertArg(to, 'Referencia')])
+}
+
+export interface PushBranchOptions {
+  /** --force-with-lease: sobrescribe solo si la remota sigue donde la vimos en el último fetch */
+  force?: boolean
+  setUpstream?: boolean
+}
+
+/** Sube una rama local concreta a `remote/remoteBranch`, esté o no activa. */
+export async function pushBranch(repo: string, branch: string, remote: string, remoteBranch: string, options: PushBranchOptions = {}): Promise<void> {
+  await assertBranchName(repo, branch)
+  await assertBranchName(repo, remoteBranch)
+  const remotes = (await git(repo, ['remote'])).split('\n').filter(Boolean)
+  if (!remotes.includes(remote)) throw new GitError(`No existe el remoto ${remote}`)
+  await git(repo, [
+    'push',
+    ...(options.force ? [`--force-with-lease=refs/heads/${remoteBranch}`] : []),
+    ...(options.setUpstream ? ['-u'] : []),
+    remote,
+    `refs/heads/${branch}:refs/heads/${remoteBranch}`
+  ])
+}
+
+const REBASE_LIMIT = 500
+
+/**
+ * Commits que reescribe un rebase interactivo, del más antiguo al más nuevo.
+ * - `from`: desde ese commit (incluido) hasta HEAD, en el mismo sitio.
+ * - `onto`: los de `tip` que no están en `base`, para llevarlos encima de `base` (como `git rebase -i base`).
+ */
+export async function getRebaseCommits(repo: string, base: string, mode: RebaseMode = 'from', tip = 'HEAD'): Promise<RebaseCommit[]> {
+  assertArg(base, 'Commit')
+  assertArg(tip, 'Rama')
+  if (mode === 'from') {
+    try {
+      await git(repo, ['merge-base', '--is-ancestor', base, 'HEAD'])
+    } catch {
+      throw new GitError('Ese commit no está en la historia de la rama actual.')
+    }
+  }
+  const range = await rebaseRange(repo, base, mode, tip)
+  const merges = (await git(repo, ['rev-list', '--merges', '--count', ...range.revs])).trim()
+  if (merges !== '0') throw new GitError('El rango tiene commits de merge: el rebase interactivo solo admite historia lineal.')
+  const out = await git(repo, ['log', '--reverse', '--format=%H%x1f%an%x1f%ae%x1f%at%x1f%B%x1e', ...range.revs, '--'])
+  const commits = out
+    .split(RS)
+    .map((r) => r.replace(/^\n/, ''))
+    .filter(Boolean)
+    .map((record) => {
+      const [hash, author, email, date, message] = record.split(FS)
+      const text = (message ?? '').trimEnd()
+      return { hash, author, email, date: Number(date) * 1000, subject: text.split('\n')[0], message: text }
+    })
+  if (commits.length > REBASE_LIMIT) throw new GitError(`Son ${commits.length} commits; el rebase interactivo admite hasta ${REBASE_LIMIT}.`)
+  return commits
+}
+
+async function rebaseRange(repo: string, base: string, mode: RebaseMode, tip = 'HEAD'): Promise<{ revs: string[]; onto: string[] }> {
+  // Igual que la lista que propone git: se omiten los commits que ya están (como cherry-pick) en la base
+  if (mode === 'onto') return { revs: ['--cherry-pick', '--right-only', `${base}...${tip}`], onto: [base] }
+  const parents = (await git(repo, ['rev-list', '--parents', '-n', '1', base])).trim().split(' ')
+  if (parents.length === 1) return { revs: ['HEAD'], onto: ['--root'] }
+  return { revs: [`${parents[1]}..HEAD`], onto: [parents[1]] }
+}
+
+/**
+ * Convierte los pasos elegidos en la lista de tareas de `git rebase -i`, validando que sean
+ * exactamente los commits del rango. Reescribir = pick + exec que cambia el mensaje desde un archivo.
+ */
+export function buildRebaseTodo(steps: RebaseStep[], commits: { hash: string }[], messageFile: (index: number) => string): string {
+  const expected = new Set(commits.map((c) => c.hash))
+  const seen = new Set<string>()
+  for (const step of steps) {
+    if (!expected.has(step.hash) || seen.has(step.hash)) throw new GitError('La lista de commits no coincide con la rama actual. Vuelve a abrir el rebase.')
+    seen.add(step.hash)
+    if (!['pick', 'reword', 'squash', 'fixup', 'drop'].includes(step.action)) throw new GitError(`Acción no válida: ${step.action}`)
+    if (step.action === 'reword' && !step.message?.trim()) throw new GitError('El mensaje nuevo no puede quedar vacío.')
+  }
+  if (seen.size !== expected.size) throw new GitError('Faltan commits en la lista del rebase.')
+  const first = steps.find((s) => s.action !== 'drop')
+  if (first && (first.action === 'squash' || first.action === 'fixup')) throw new GitError('El primer commit que se conserva no puede combinarse con uno anterior.')
+  const lines: string[] = []
+  steps.forEach((step, i) => {
+    if (step.action === 'reword') lines.push(`pick ${step.hash}`, `exec git commit --amend --allow-empty --no-verify --cleanup=strip -F '${messageFile(i)}'`)
+    else lines.push(`${step.action} ${step.hash}`)
+  })
+  return lines.join('\n') + '\n'
+}
+
+export async function interactiveRebase(repo: string, base: string, steps: RebaseStep[], mode: RebaseMode = 'from'): Promise<void> {
+  if ((await getRepoState(repo)).operation) throw new GitError('Hay otra operación en curso: termínala o abórtala primero.')
+  const commits = await getRebaseCommits(repo, base, mode)
+  const dir = await mkdtemp(join(tmpdir(), 'codyken-rebase-'))
+  if (dir.includes("'")) throw new GitError('Ruta temporal no válida')
+  const messageFile = (i: number): string => join(dir, `mensaje-${i}.txt`)
+  const todo = buildRebaseTodo(steps, commits, messageFile)
+  await Promise.all(steps.map((s, i) => (s.action === 'reword' ? writeFile(messageFile(i), s.message!.trim() + '\n', 'utf8') : null)))
+  await writeFile(join(dir, 'todo'), todo, 'utf8')
+  const { onto } = await rebaseRange(repo, base, mode)
+  try {
+    // git ejecuta GIT_SEQUENCE_EDITOR con la ruta de su lista: la reemplazamos por la nuestra
+    await git(repo, ['rebase', '-i', '--autostash', ...onto], { env: { GIT_SEQUENCE_EDITOR: `cp '${join(dir, 'todo')}'` } })
+  } catch (error) {
+    if ((await getRepoState(repo)).operation === 'rebase') {
+      // Los exec pendientes leen los mensajes de esta carpeta: se conserva hasta que termine el rebase
+      throw new GitError(`El rebase se detuvo: resuelve los conflictos y pulsa Continuar, o Abortar para volver atrás.\n\n${error instanceof Error ? error.message : String(error)}`)
+    }
+    await rm(dir, { recursive: true, force: true })
+    throw error
+  }
+  await rm(dir, { recursive: true, force: true })
 }
 
 export async function cherryPick(repo: string, hash: string, isMerge: boolean): Promise<void> {
@@ -550,10 +769,168 @@ export async function deleteTag(repo: string, name: string): Promise<void> {
   await git(repo, ['tag', '-d', assertArg(name, 'Etiqueta')])
 }
 
+// ── Worktrees ───────────────────────────────────────────────────────────────
+
+export function parseWorktrees(out: string): Worktree[] {
+  const list: Worktree[] = []
+  for (const block of out.split(/\n\n+/)) {
+    const lines = block.split('\n').filter(Boolean)
+    if (!lines[0]?.startsWith('worktree ')) continue
+    const tree: Worktree = { path: lines[0].slice(9), head: null, branch: null, detached: false, bare: false, locked: false, prunable: false, isMain: list.length === 0 }
+    for (const line of lines.slice(1)) {
+      if (line.startsWith('HEAD ')) tree.head = line.slice(5)
+      else if (line.startsWith('branch ')) tree.branch = line.slice(7).replace(/^refs\/heads\//, '')
+      else if (line === 'detached') tree.detached = true
+      else if (line === 'bare') tree.bare = true
+      else if (line === 'locked' || line.startsWith('locked ')) tree.locked = true
+      else if (line === 'prunable' || line.startsWith('prunable ')) tree.prunable = true
+    }
+    list.push(tree)
+  }
+  return list
+}
+
+export async function getWorktrees(repo: string): Promise<Worktree[]> {
+  return parseWorktrees(await git(repo, ['worktree', 'list', '--porcelain']))
+}
+
+export async function addWorktree(repo: string, path: string, branch: string, newBranch: boolean): Promise<string> {
+  if (!isAbsolute(path) || path.includes('\0')) throw new GitError(`Ruta no válida: ${path}`)
+  if (existsSync(path)) throw new GitError(`Ya existe la carpeta ${path}`)
+  if (!existsSync(dirname(path))) throw new GitError(`No existe la carpeta ${dirname(path)}`)
+  await assertBranchName(repo, branch)
+  if (newBranch) await git(repo, ['worktree', 'add', '-b', branch, '--', path, 'HEAD'])
+  else await git(repo, ['worktree', 'add', '--', path, branch])
+  return resolveRepo(path)
+}
+
+export async function removeWorktree(repo: string, path: string, force: boolean): Promise<void> {
+  const known = await getWorktrees(repo)
+  const tree = known.find((w) => w.path === path)
+  if (!tree) throw new GitError('Ese worktree no pertenece a este repositorio')
+  if (tree.isMain) throw new GitError('No se puede eliminar el worktree principal')
+  await git(repo, ['worktree', 'remove', ...(force ? ['--force'] : []), '--', path])
+}
+
+export async function pruneWorktrees(repo: string): Promise<void> {
+  await git(repo, ['worktree', 'prune'])
+}
+
+// ── Git LFS ─────────────────────────────────────────────────────────────────
+
+/** Salida de `git lfs track` sin argumentos: líneas "    *.psd (.gitattributes)" */
+export function parseLfsTrack(out: string): LfsInfo['patterns'] {
+  const patterns: LfsInfo['patterns'] = []
+  for (const line of out.split('\n')) {
+    const match = /^\s+(.+?) \((.+)\)$/.exec(line)
+    if (match) patterns.push({ pattern: match[1], source: match[2] })
+  }
+  return patterns
+}
+
+/** Salida de `git lfs ls-files --long`: "<oid> * ruta" (descargado) o "<oid> - ruta" (solo el puntero) */
+export function parseLfsFiles(out: string): LfsInfo['files'] {
+  const files: LfsInfo['files'] = []
+  for (const line of out.split('\n')) {
+    const match = /^([0-9a-f]{7,64}) ([*-]) (.+)$/.exec(line)
+    if (match) files.push({ oid: match[1], downloaded: match[2] === '*', path: match[3] })
+  }
+  return files
+}
+
+export function parseLfsAttributes(text: string): LfsInfo['patterns'] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#') && /\sfilter=lfs(\s|$)/.test(line))
+    .map((line) => ({ pattern: line.split(/\s+/)[0], source: '.gitattributes' }))
+}
+
+export async function getLfsInfo(repo: string): Promise<LfsInfo> {
+  let version: string
+  try {
+    version = (await git(repo, ['lfs', 'version'])).trim()
+  } catch {
+    // Sin git-lfs: igual se avisa si el repo lo usa, leyendo .gitattributes
+    const attributes = await readFile(join(repo, '.gitattributes'), 'utf8').catch(() => '')
+    return { installed: false, version: null, patterns: parseLfsAttributes(attributes), files: [] }
+  }
+  const patterns = parseLfsTrack(await git(repo, ['lfs', 'track']).catch(() => ''))
+  const files = patterns.length ? parseLfsFiles(await git(repo, ['lfs', 'ls-files', '--long']).catch(() => '')) : []
+  return { installed: true, version, patterns, files }
+}
+
+function assertPattern(pattern: string): string {
+  if (!pattern.trim() || pattern.startsWith('-') || /[\0\n]/.test(pattern)) throw new GitError(`Patrón no válido: ${pattern}`)
+  return pattern.trim()
+}
+
+export async function lfsTrack(repo: string, pattern: string): Promise<void> {
+  await git(repo, ['lfs', 'track', '--', assertPattern(pattern)])
+}
+
+export async function lfsUntrack(repo: string, pattern: string): Promise<void> {
+  await git(repo, ['lfs', 'untrack', '--', assertPattern(pattern)])
+}
+
+export async function lfsPull(repo: string): Promise<void> {
+  await git(repo, ['lfs', 'pull'])
+}
+
 // ── Remotos ─────────────────────────────────────────────────────────────────
 
-export async function fetch(repo: string): Promise<void> {
-  await git(repo, ['fetch', '--all', '--prune', '--quiet'])
+/**
+ * Trae todos los remotos (y la historia completa si el clon era superficial) y después adelanta las ramas
+ * locales que solo están atrasadas respecto a su remota: `git fetch` por sí solo nunca mueve las ramas locales.
+ * No se tocan las que tienen commits propios, las activas en otro worktree ni, salvo `updateCurrent`, la actual.
+ */
+export async function fetch(repo: string, options: { updateCurrent?: boolean } = {}): Promise<FetchResult> {
+  const shallow = (await git(repo, ['rev-parse', '--is-shallow-repository'])).trim() === 'true'
+  await git(repo, ['fetch', '--all', '--prune', '--quiet', ...(shallow ? ['--unshallow'] : [])])
+  const result: FetchResult = { updated: [], diverged: [], skipped: [], unshallowed: shallow }
+
+  const [refs, state, worktrees] = await Promise.all([getRefs(repo), getRepoState(repo), getWorktrees(repo).catch(() => [])])
+  const elsewhere = new Map(worktrees.filter((w) => w.branch && w.branch !== state.branch).map((w) => [w.branch!, w.path]))
+  // Nombre completo de cada upstream (`refs/heads/x@{upstream}` no es una sintaxis válida)
+  const upstreams = new Map(
+    (await git(repo, ['for-each-ref', '--format=%(refname)%1f%(upstream)', 'refs/heads']))
+      .split('\n')
+      .map((line) => line.split(FS))
+      .filter(([, upstream]) => upstream)
+      .map(([name, upstream]) => [name, upstream] as const)
+  )
+  for (const ref of refs) {
+    if (ref.type !== 'local' || !ref.upstream || ref.gone || !ref.behind) continue
+    if (ref.ahead) {
+      result.diverged.push(ref.name)
+      continue
+    }
+    const upstream = upstreams.get(ref.fullName)
+    const to = upstream ? (await git(repo, ['rev-parse', '--verify', '-q', `${upstream}^{commit}`], { okCodes: [0, 1] })).trim() : ''
+    if (!to) continue
+    if (elsewhere.has(ref.name)) {
+      result.skipped.push({ branch: ref.name, reason: `está activa en el worktree ${basename(elsewhere.get(ref.name)!)}` })
+      continue
+    }
+    try {
+      if (ref.isHead) {
+        if (!options.updateCurrent) continue
+        if (state.operation) {
+          result.skipped.push({ branch: ref.name, reason: 'hay una operación en curso' })
+          continue
+        }
+        // Rechaza el avance si pisaría cambios sin confirmar
+        await git(repo, ['merge', '--ff-only', '--quiet', to])
+      } else {
+        await git(repo, ['update-ref', '-m', `codyken: fetch, fast-forward a ${ref.upstream}`, ref.fullName, to, ref.hash])
+      }
+      result.updated.push({ branch: ref.name, from: ref.hash, to, current: !!ref.isHead })
+    } catch (error) {
+      const reason = ref.isHead ? 'tus cambios sin confirmar lo impiden' : error instanceof Error ? error.message.split('\n')[0] : String(error)
+      result.skipped.push({ branch: ref.name, reason })
+    }
+  }
+  return result
 }
 
 export async function pull(repo: string, mode: PullMode): Promise<void> {

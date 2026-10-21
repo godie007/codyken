@@ -16,19 +16,20 @@ related:
 
 Todo lo descrito en esta bóveda: gráfico con carriles y stashes, ramas locales/remotas, ocultar ramas, staging por línea, diff con sintaxis, historial y blame, deshacer, fetch/pull/push, conflictos, paleta, tema Monokai.
 
-## v2
+## v0.2 — hecho (2026-10-20)
 
-- [ ] Rehacer
-- [ ] Rebase interactivo (reordenar, unir, editar mensajes)
-- [ ] Comparar dos commits o ramas
+- [x] Rehacer ([[03 - Algoritmos/Pila de Deshacer]])
+- [x] Rebase interactivo: reordenar, unir, editar mensajes, descartar; en el sitio o sobre otra rama ([[05 - Flujos de Trabajo/Rebase Interactivo]])
+- [x] Comparar dos commits o ramas ([[05 - Flujos de Trabajo/Comparar Commits y Ramas]])
+- [x] Arrastrar y soltar ramas: fast-forward, merge, rebase, push y pull request ([[05 - Flujos de Trabajo/Arrastrar y Soltar Ramas]])
+- [x] Integraciones: pull requests de GitHub/GitLab ([[05 - Flujos de Trabajo/Pull Requests]])
+- [x] Worktrees y Git LFS ([[05 - Flujos de Trabajo/Worktrees y LFS]])
+- [x] Editor de conflictos de tres paneles ([[05 - Flujos de Trabajo/Resolver Conflictos]])
+
+## Próximo
+
 - [ ] Terminal integrada
 - [ ] Empaquetado `.dmg` firmado (electron-builder)
 - [ ] Ancho del gráfico ajustable
-
-## v3
-
-- [ ] Integraciones: pull requests de GitHub/GitLab
-- [ ] Worktrees
-- [ ] Git LFS
 - [ ] Perfiles con identidad git distinta por repo
-- [ ] Editor de conflictos de tres paneles
+- [ ] Probar GitLab (`glab`) y Git LFS contra instalaciones reales ([[Limitaciones Conocidas]])

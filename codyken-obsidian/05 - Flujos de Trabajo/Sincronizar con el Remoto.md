@@ -17,13 +17,29 @@ related:
 
 ## Fetch
 
-Botón **Fetch** (⌘L): `git fetch --all --prune`. Trae ramas, etiquetas y commits nuevos de **todos los remotos** sin tocar tus ramas ni tus archivos. Después:
+Botón **Fetch** (⌘L): `git fetch --all --prune` (con `--unshallow` si el clon era superficial, para traer la historia completa). Trae ramas, etiquetas y commits nuevos de **todos los remotos**.
+
+`git fetch` por sí solo **nunca mueve las ramas locales**: solo actualiza `origin/…`. Por eso, después del fetch, Codyken **adelanta (fast-forward) cada rama local que solo estaba atrasada** respecto a su upstream:
+
+| Rama local | Qué pasa |
+|---|---|
+| Solo atrasada (`↓n`, sin `↑`) | Se adelanta hasta su remota con `update-ref` (comprobando el valor anterior) |
+| La rama actual, solo atrasada | Solo con el botón Fetch, con `merge --ff-only`: git lo rechaza si pisaría cambios sin confirmar y queda en el aviso. El fetch automático no la toca, para no cambiar archivos mientras trabajas |
+| Con commits propios y del remoto (`↑n ↓m`) | No se toca; el aviso dice que necesita pull (merge o rebase) |
+| Activa en otro worktree | No se toca; el aviso dice en cuál |
+| Con commits propios sin bajar nada (`↑n`) | Nada que traer: hay que hacer push |
+
+El aviso resume qué ramas se adelantaron, cuáles divergen y cuáles se saltaron. **Deshacer** (⌘Z) devuelve las ramas locales a donde estaban (las remotas siguen actualizadas); el fetch automático adelanta sin registrar deshacer.
+
+![[fetch.png]]
+
+Después:
 
 - los globos de Pull/Push y los `↑n` / `↓n` del panel izquierdo se actualizan;
 - las ramas remotas nuevas aparecen en **Remoto** y en el gráfico (punteadas si no las tienes en local);
 - las borradas en el servidor desaparecen y la local que las seguía muestra `✕`.
 
-Además se hace un fetch silencioso a los 4 s de abrir el repo y cada 10 minutos.
+Además se hace un fetch silencioso a los 4 s de abrir el repo y cada 10 minutos (adelanta las ramas atrasadas salvo la actual).
 
 ## Pull
 

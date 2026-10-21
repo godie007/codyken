@@ -1,6 +1,6 @@
 ---
 title: Gráfico de Commits
-description: Columnas, nodos, etiquetas, fila WIP, búsqueda, menús y arrastrar y soltar del gráfico
+description: Columnas, nodos, etiquetas, fila WIP, búsqueda, menús, comparar con ⌘-clic y arrastrar y soltar del gráfico
 type: interfaz
 tags:
   - interfaz
@@ -27,7 +27,7 @@ Componente: `src/renderer/src/components/GraphView.tsx`. Lista **virtualizada** 
 | Gráfico | según carriles (máx. 8) | Carriles y nodos |
 | Mensaje del commit | resto (mín. 140 px) | Asunto; en la fila WIP, el campo de resumen |
 | Autor | 132 px | Avatar con iniciales + nombre |
-| Fecha | 104 px | Relativa ("hace 3 días"); la completa en el tooltip |
+| Fecha | 118 px | Relativa ("hace 3 días"); la completa en el tooltip |
 | SHA | 74 px | Oculta por defecto |
 
 Clic derecho en el encabezado (o la flecha ▾) para elegir columnas.
@@ -44,24 +44,26 @@ Clic derecho en el encabezado (o la flecha ▾) para elegir columnas.
 | Estilo | Significado |
 |---|---|
 | Relleno sólido con ✓ | Rama actual (HEAD) |
-| Borde del color del carril + barra izquierda | Rama local (💻; ☁ si la remota está en el mismo commit) |
+| Borde del color del carril + barra izquierda | Rama local (💻; ☁ si la remota está en el mismo commit: es **una sola píldora** para las dos) |
 | Punteada, prefijo `origin/` atenuado | Solo existe en el remoto |
 | Redondeada amarilla con 🏷 | Etiqueta (tag) |
 | `+n` | Hay más etiquetas en ese commit: al pasar el ratón se despliegan todas |
 
 - **Doble clic** en una píldora: checkout (una remota crea la local con seguimiento; una etiqueta deja HEAD desacoplado).
 - **Clic derecho**: menú de la rama ([[04 - Interfaz/Panel Izquierdo#Menú de una rama]]).
-- **Arrastrar** una píldora sobre una fila con rama local → menú *Merge de X en Y* / *Rebase de Y sobre X* (hace checkout del destino si hace falta).
+- **Arrastrar** una píldora de rama (local, remota o combinada) y soltarla sobre **otra píldora de rama** —local, remota o combinada— o sobre la fila (usa su primera rama, la local si la hay). La píldora de destino se marca con borde punteado amarillo (`pill-drop`) y la fila con contorno (`drop-target`). El menú ofrece fast-forward, merge, rebase, rebase interactivo, push o pull request según cómo estén las dos ramas: [[05 - Flujos de Trabajo/Arrastrar y Soltar Ramas]].
+- También se puede soltar en el gráfico una rama arrastrada desde el panel izquierdo, y al revés.
 
 ## Filas
 
 - Clic: selecciona (el panel derecho muestra el detalle). Doble clic en un commit: checkout de su rama (o del commit, desacoplado, previa confirmación).
+- **⌘‑clic** (Ctrl‑clic) en otro commit: lo [[05 - Flujos de Trabajo/Comparar Commits y Ramas|compara]] con el seleccionado. La base queda marcada (`compare-base`) junto con el destino; Esc termina la comparación.
 - Al pasar el ratón sobre una rama del panel izquierdo, su commit se resalta.
 - ↑/↓ o J/K mueven la selección.
 
 ## Menú de un commit
 
-Checkout de este commit · Crear rama aquí… · Crear etiqueta aquí… · Cherry-pick en la rama actual · Revertir este commit · Reset de la rama actual a este commit (Soft / Mixed / Hard) · Copiar SHA · Copiar mensaje.
+Checkout de este commit · Crear rama aquí… · Crear etiqueta aquí… · Comparar con {rama actual} · Comparar con X (seleccionado) · Rebase interactivo desde aquí… (si es antepasado de HEAD) · Cherry-pick en la rama actual · Revertir este commit · Reset de la rama actual a este commit (Soft / Mixed / Hard) · Copiar SHA · Copiar mensaje.
 
 ## Búsqueda
 

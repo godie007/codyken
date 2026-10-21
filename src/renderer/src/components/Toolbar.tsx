@@ -16,6 +16,7 @@ export interface ToolbarProps {
   headRef: Ref | undefined
   busy: string | null
   undoLabel: string | null
+  redoLabel: string | null
   stashCount: number
   pullMode: PullMode
   leftVisible: boolean
@@ -24,6 +25,7 @@ export interface ToolbarProps {
   repoMenu: ReactNode
   onRepoMenu: () => void
   onUndo: () => void
+  onRedo: () => void
   onPull: (mode: PullMode) => void
   onFetch: () => void
   onPullModeChange: (mode: PullMode) => void
@@ -81,8 +83,9 @@ export function Toolbar(props: ToolbarProps) {
 
       <div className="toolbar-actions">
         <ToolButton icon={<Icon.Undo size={17} />} label="Deshacer" disabled={disabled || !props.undoLabel} onClick={props.onUndo} title={props.undoLabel ? `Deshacer: ${props.undoLabel} (${mod}Z)` : 'Nada que deshacer'} />
+        <ToolButton icon={<Icon.Redo size={17} />} label="Rehacer" disabled={disabled || !props.redoLabel} onClick={props.onRedo} title={props.redoLabel ? `Rehacer: ${props.redoLabel} (⇧${mod}Z)` : 'Nada que rehacer'} />
         <span className="toolbar-sep" />
-        <ToolButton icon={<Icon.Download size={17} />} label="Fetch" disabled={disabled} onClick={props.onFetch} title={`Traer cambios de todos los remotos sin tocar tus ramas (${mod}L)`} />
+        <ToolButton icon={<Icon.Download size={17} />} label="Fetch" disabled={disabled} onClick={props.onFetch} title={`Traer todos los remotos y adelantar las ramas locales que solo estaban atrasadas (${mod}L)`} />
         <div className="split-btn">
           <ToolButton icon={<Icon.Pull size={17} />} label="Pull" badge={headRef?.behind} disabled={disabled} onClick={() => props.onPull(props.pullMode)} title={PULL_LABELS[props.pullMode]} />
           <button className="split-btn-arrow" disabled={disabled} onClick={() => void pullMenu()} title="Opciones de pull">

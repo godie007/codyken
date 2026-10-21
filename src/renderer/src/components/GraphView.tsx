@@ -3,7 +3,8 @@ import type { ColumnId, Commit, WorkingStatus } from '../../../shared/types'
 import { api, mod } from '../api'
 import { formatFullDate, initials, relativeTime, shortHash } from '../lib/format'
 import { laneColor, WIP_HASH, type GraphLayout, type GraphRow } from '../lib/graph'
-import { labelRef, type RefLabel } from '../lib/refs'
+import { REF_MIME } from '../lib/drop'
+import { labelFullName, type RefLabel } from '../lib/refs'
 import { Icon } from './Icons'
 import { Avatar } from './ui'
 
@@ -30,6 +31,8 @@ export interface GraphViewProps {
   labels: Map<string, RefLabel[]>
   head: string | null
   selected: string | null
+  /** Primer extremo de una comparación (se resalta junto al seleccionado) */
+  compareBase?: string | null
   highlight: string | null
   columns: ColumnId[]
   canLoadMore: boolean
@@ -39,10 +42,12 @@ export interface GraphViewProps {
   filterActive: boolean
   onWipSummary: (summary: string) => void
   onColumnsChange: (columns: ColumnId[]) => void
-  onSelect: (hash: string) => void
+  /** extend: ⌘/Ctrl+clic, para comparar con lo que ya estaba seleccionado */
+  onSelect: (hash: string, extend?: boolean) => void
   onCommitMenu: (commit: Commit) => void
   onLabelMenu: (label: RefLabel) => void
   onLabelActivate: (label: RefLabel) => void
+  /** Se soltó una rama (referencia completa) sobre una etiqueta de rama, local o remota */
   onLabelDrop: (sourceRef: string, target: RefLabel) => void
   onCommitActivate: (commit: Commit) => void
   onLoadMore: () => void
@@ -62,7 +67,7 @@ export function GraphView(props: GraphViewProps) {
   const graphWidth = Math.min(graph.maxLanes, MAX_VISIBLE_LANES) * LANE_W + 12
   const visible = COLUMN_ORDER.filter((c) => c === 'message' || columns.includes(c))
   const template = visible
-    .map((c) => ({ refs: '184px', graph: `${graphWidth}px`, message: 'minmax(140px, 1fr)', author: '132px', date: '104px', sha: '74px' })[c])
+    .map((c) => ({ refs: '184px', graph: `${graphWidth}px`, message: 'minmax(140px, 1fr)', author: '132px', date: '118px', sha: '74px' })[c])
     .join(' ')
 
   const matches = useMemo(() => {
@@ -150,7 +155,8 @@ export function GraphView(props: GraphViewProps) {
         visible={visible}
         template={template}
         graphWidth={graphWidth}
-        selected={selected === hash}
+        selected={selected === hash || props.compareBase === hash}
+        compareBase={props.compareBase === hash}
         highlighted={props.highlight === hash}
         dimmed={!!matches && (!commit || !matches.has(commit.hash))}
         isHead={!!commit && commit.hash === props.head}
@@ -212,6 +218,7 @@ interface RowProps {
   template: string
   graphWidth: number
   selected: boolean
+  compareBase: boolean
   highlighted: boolean
   dimmed: boolean
   isHead: boolean
@@ -219,19 +226,20 @@ interface RowProps {
   props: GraphViewProps
 }
 
-function GraphRowView({ index, commit, row, visible, template, graphWidth, selected, highlighted, dimmed, isHead, labels, props }: RowProps) {
+function GraphRowView({ index, commit, row, visible, template, graphWidth, selected, compareBase, highlighted, dimmed, isHead, labels, props }: RowProps) {
   const [dropping, setDropping] = useState(false)
   const color = row ? laneColor(row.color) : 'var(--accent)'
   const isWip = !commit
   const hash = commit?.hash ?? WIP_HASH
-  const localTarget = labels?.find((l) => l.local)
+  // Al soltar sobre la fila (fuera de una etiqueta) el destino es su primera rama, la local si la hay
+  const dropTarget = labels?.find((l) => l.kind === 'branch' && l.local) ?? labels?.find((l) => l.kind === 'branch')
   const hasLabels = !!labels?.length
 
   return (
     <div
-      className={`graph-row ${selected ? 'selected' : ''} ${highlighted ? 'highlighted' : ''} ${dimmed ? 'dimmed' : ''} ${isWip ? 'wip' : ''} ${dropping ? 'drop-target' : ''}`}
+      className={`graph-row ${selected ? 'selected' : ''} ${compareBase ? 'compare-base' : ''} ${highlighted ? 'highlighted' : ''} ${dimmed ? 'dimmed' : ''} ${isWip ? 'wip' : ''} ${dropping ? 'drop-target' : ''}`}
       style={{ top: index * ROW_H, height: ROW_H, gridTemplateColumns: template, ['--lane' as string]: color }}
-      onClick={() => props.onSelect(hash)}
+      onClick={(e) => props.onSelect(hash, e.metaKey || e.ctrlKey)}
       onDoubleClick={() => commit && props.onCommitActivate(commit)}
       onContextMenu={(e) => {
         e.preventDefault()
@@ -241,16 +249,17 @@ function GraphRowView({ index, commit, row, visible, template, graphWidth, selec
         }
       }}
       onDragOver={(e) => {
-        if (localTarget && e.dataTransfer.types.includes('application/x-codyken-ref')) {
+        if (dropTarget && e.dataTransfer.types.includes(REF_MIME)) {
           e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
           setDropping(true)
         }
       }}
       onDragLeave={() => setDropping(false)}
       onDrop={(e) => {
         setDropping(false)
-        const source = e.dataTransfer.getData('application/x-codyken-ref')
-        if (source && localTarget && source !== labelRef(localTarget)) props.onLabelDrop(source, localTarget)
+        const source = e.dataTransfer.getData(REF_MIME)
+        if (source && dropTarget) props.onLabelDrop(source, dropTarget)
       }}
     >
       {visible.map((column) => {
@@ -359,6 +368,8 @@ function RefPills({ labels, color, props }: { labels: RefLabel[]; color: string;
 }
 
 function RefPill({ label, color, props }: { label: RefLabel; color: string; props: GraphViewProps }) {
+  const [over, setOver] = useState(false)
+  const isBranch = label.kind === 'branch'
   const remoteOnly = !label.local && label.remotes.length > 0
   const remoteNames = label.remotes.map((r) => r.remote).join(', ')
   const title =
@@ -372,13 +383,31 @@ function RefPill({ label, color, props }: { label: RefLabel; color: string; prop
   const slash = remoteOnly ? label.name.indexOf('/') : -1
   return (
     <span
-      className={`pill pill-${label.kind} ${label.isHead ? 'pill-head' : ''} ${remoteOnly ? 'pill-remote' : ''}`}
+      className={`pill pill-${label.kind} ${label.isHead ? 'pill-head' : ''} ${remoteOnly ? 'pill-remote' : ''} ${over ? 'pill-drop' : ''}`}
       style={{ ['--pill' as string]: color }}
-      draggable={label.kind === 'branch'}
-      title={`${title}\nDoble clic: checkout · Arrastra sobre otra rama: merge o rebase`}
+      draggable={isBranch}
+      title={`${title}\nDoble clic: checkout${isBranch ? ' · Arrástrala sobre otra rama: merge, rebase, push o pull request' : ''}`}
       onDragStart={(e) => {
-        e.dataTransfer.setData('application/x-codyken-ref', labelRef(label))
+        const ref = labelFullName(label)
+        if (!ref) return e.preventDefault()
+        e.dataTransfer.setData(REF_MIME, ref)
         e.dataTransfer.effectAllowed = 'move'
+      }}
+      onDragOver={(e) => {
+        if (!isBranch || !e.dataTransfer.types.includes(REF_MIME)) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'move'
+        setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        setOver(false)
+        const source = e.dataTransfer.getData(REF_MIME)
+        if (!isBranch || !source) return
+        e.preventDefault()
+        e.stopPropagation()
+        props.onLabelDrop(source, label)
       }}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => {

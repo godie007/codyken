@@ -57,3 +57,36 @@ up: "[[00 - Inicio]]"
 
 **Decisión:** cada entrada guarda el HEAD/rama que dejó la acción y solo se ejecuta si siguen igual.
 **Motivo:** deshacer a ciegas después de cambios hechos en la terminal podría borrar trabajo.
+
+## Semántica de arrastrar y soltar
+
+**Decisión:** al soltar X sobre Y, el **merge** lleva X dentro de Y y el **rebase** reconstruye X encima de Y; una remota sobre una local trae sus cambios (fast-forward, merge o rebase de la local) y una local sobre una remota la sube. El menú se calcula con la divergencia real de las dos ramas (`planDrop`) y solo muestra lo que tiene sentido.
+**Motivo:** es la operativa de los clientes Git visuales (soltar mi rama sobre `main` para rebasarla encima, soltar `main` sobre `origin/main` para subirla). Antes el rebase era el inverso (*Rebase de Y sobre X*) y no se podía soltar sobre una rama remota.
+**Consecuencia:** todo lo que cambia ramas locales se puede deshacer; si el destino no es la rama actual se hace checkout antes y el deshacer vuelve a la rama en la que estabas. Detalle: [[05 - Flujos de Trabajo/Arrastrar y Soltar Ramas]].
+
+## Push forzado siempre con lease y confirmación
+
+**Decisión:** cuando la rama remota tiene commits que la local no tiene, el menú solo ofrece *Push forzado…*, que pide confirmación destructiva y usa `--force-with-lease=refs/heads/<rama>`; nunca `--force`.
+**Motivo:** el lease solo sobrescribe si la remota sigue donde la vio el último fetch, así no se pierde trabajo que alguien subió después. El push no se puede deshacer desde Codyken.
+
+## Una sola entrada para local y remota iguales
+
+**Decisión:** si una rama local y su remota están en el mismo commit, se muestran una sola vez: una etiqueta combinada en el gráfico (uniendo primero por la rama que sigue y luego por el nombre) y, en el panel, solo en *Local*; en *Remoto* se agrupan plegadas en *n iguales a su rama local*.
+**Motivo:** verlas duplicadas hacía pensar que eran dos ramas distintas y llenaba el panel en repos con muchas ramas al día. Las que difieren o solo existen en el remoto siguen visibles, que es la información útil.
+**Consecuencia:** al filtrar por texto se muestran todas las coincidencias, también las agrupadas, para que la búsqueda no esconda nada.
+
+## Rebase interactivo sin editor
+
+**Decisión:** el rebase interactivo arma su propia lista y la entrega con `GIT_SEQUENCE_EDITOR="cp '<lista>'"`; *reescribir* es `pick` + `exec git commit --amend -F <archivo>`.
+**Motivo:** git sigue haciendo todo el trabajo (conflictos, `--continue`, `--abort`, autostash) sin abrir un editor interactivo, y los mensajes nuevos viajan en archivos, nunca en la línea de comandos. La lista se valida contra los commits reales del rango antes de tocar el repo.
+
+## Pull requests con las CLI oficiales
+
+**Decisión:** listar y hacer checkout de PRs con `gh` / `glab` y crearlos abriendo la página del proveedor.
+**Motivo:** Codyken no guarda tokens ni implementa OAuth: reutiliza la sesión que ya existe en la CLI, como hace con las credenciales de git. Crear el PR en la web deja revisar título, descripción y revisores en la herramienta de siempre.
+
+## Fetch que adelanta las ramas atrasadas
+
+**Decisión:** después de `git fetch --all --prune`, toda rama local que solo esté atrasada respecto a su upstream se adelanta (fast-forward); la actual solo con el botón y con `merge --ff-only`. Las divergentes y las activas en otro worktree no se tocan y se avisan.
+**Motivo:** con `git fetch` a secas las ramas locales se quedaban atrás aunque el remoto estuviera al día, y parecía que el fetch no funcionaba. Un fast-forward no pierde commits (la rama no tenía nada propio), así que es seguro; aun así se deshace con ⌘Z.
+**Consecuencia:** el fetch automático no mueve la rama actual para no cambiar archivos mientras trabajas.

@@ -37,4 +37,12 @@ Además conviene probar con un **repo real grande** (cientos de ramas de desplie
 - [ ] Historial sigue renombres; Blame resalta el commit al pasar el ratón.
 - [ ] ⌘P filtra acciones; Fetch actualiza los globos de Pull/Push.
 - [ ] ⇧⌘O abre los recientes: buscar + Enter abre el repo; ✕ y *Quitar no encontrados* lo quitan de la lista y de `settings.json`; la bienvenida muestra la misma lista.
-- [ ] Merge con conflicto → aviso con Abortar/Continuar → resolver → Continuar crea el merge.
+- [ ] Merge con conflicto → aviso con Abortar/Continuar → resolver en el editor de tres paneles (casillas, *Guardar y resolver*) → Continuar crea el merge.
+- [ ] Commit → Deshacer → Rehacer (⇧⌘Z) → el commit vuelve y la caja queda vacía; una acción nueva desactiva Rehacer.
+- [ ] Rebase interactivo: mover, combinar y reescribir → el log queda como se eligió; ⌘Z lo deshace.
+- [ ] ⌘‑clic en otro commit abre *Comparar* con los commits de cada lado y los archivos distintos; Esc la cierra.
+- [ ] Una rama igual en local y en remoto sale **una vez** en el gráfico y en el panel (*n iguales a su rama local*).
+- [ ] Arrastrar `main` sobre `origin/main` atrasada ofrece *Push*; si divergen, *Push forzado…* y *Rebase*; una remota sobre su local ofrece *Fast-forward* y *Merge*; una local sobre `origin` del panel la publica.
+- [ ] Con GitHub y `gh` con sesión, la sección *Pull requests* lista los abiertos; sin `gh`, explica cómo instalarlo.
+- [ ] *Nuevo worktree…* crea la carpeta y la abre en otra pestaña; *Eliminar worktree…* la quita.
+- [ ] Un repo con patrones LFS y sin git-lfs muestra el aviso de instalación.

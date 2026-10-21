@@ -21,7 +21,7 @@ Componente: `src/renderer/src/components/CommitPanel.tsx`. Cambia según la sele
 
 - Cabecera "n archivos cambiados en ⎇ rama", selector **lista / árbol** y 🗑 *Descartar todos los cambios*.
 - Aviso de **operación en curso** (merge, rebase, cherry-pick, revert) con **Abortar** y **Continuar**.
-- **En conflicto**: archivos con conflicto y botón *Marcar resuelto*.
+- **En conflicto**: archivos con conflicto y botón *Marcar resuelto*; clic en uno abre el [[05 - Flujos de Trabajo/Resolver Conflictos|editor de tres paneles]].
 - **Preparar todos los cambios** (⇧⌘S), botón ancho verde.
 - **Sin preparar** (con *Preparar todo*): cada archivo con 🗑 descartar y *Preparar*; en árbol, cada carpeta con *Preparar carpeta*.
 - **Preparados** (con *Quitar todo*, ⇧⌘U): cada archivo con *Quitar*; carpetas con *Quitar carpeta*.
@@ -48,3 +48,9 @@ Botones **Aplicar y eliminar (pop)**, **Aplicar** y **Eliminar**, el mensaje, au
 ## Menú de un archivo
 
 Ver cambios · Preparar / Descartar cambios… (sin preparar) · Quitar de preparados (preparado) · Usar versión HEAD / Usar versión entrante / Marcar resuelto (conflicto) · **Ver historial del archivo** · **Blame** · Copiar ruta.
+
+## Comparando dos commits o ramas
+
+Con ⌘‑clic en el gráfico o *Comparar con…*, el panel pasa a **Comparar**: los dos extremos (`base → destino`), ⇄ para invertirlos, ✕ / Esc para terminar, los commits de cada lado (desplegables) y los **archivos distintos**, que abren su diff entre los dos puntos. Ver [[05 - Flujos de Trabajo/Comparar Commits y Ramas]].
+
+![[comparar.png]]

@@ -47,6 +47,12 @@ El contrato completo está tipado en `Api` (`src/shared/types.ts`), así que ren
 | `openTerminal` / `openInFinder` | `open -a Terminal <repo>` y `shell.openPath` (abre la carpeta en Finder) |
 | `watchRepo` / `unwatchRepo` | Activa o detiene la vigilancia |
 | `getSettings` / `updateSettings` | [[02 - Capa Git/Ajustes Persistentes]] |
+| `openExternal(url)` | Abre un enlace en el navegador del sistema; **solo `https://`** (PRs, páginas para crear un PR) |
+
+Las integraciones con GitHub y GitLab (`getPullRequests`, `checkoutPullRequest`) viven en `src/main/integrations.ts`: lanzan `gh` / `glab` sin shell, como git ([[05 - Flujos de Trabajo/Pull Requests]]).
+
+> [!tip] Modo captura
+> En desarrollo, `confirm` y `contextMenu` pueden contestarse solos (`CODYKEN_SNAPSHOT_CONFIRM`, `CODYKEN_SNAPSHOT_MENU`) para automatizar capturas: [[06 - QA y Tests/Modo Captura]].
 
 ## 🪟 Ventana y menú
 

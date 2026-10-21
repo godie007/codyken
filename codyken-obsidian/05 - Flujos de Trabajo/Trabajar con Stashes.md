@@ -7,7 +7,7 @@ tags:
   - stash
 updated: 2026-10-20
 up: "[[00 - Inicio]]"
-prev: "[[05 - Flujos de Trabajo/Resolver Conflictos]]"
+prev: "[[05 - Flujos de Trabajo/Worktrees y LFS]]"
 next: "[[05 - Flujos de Trabajo/Deshacer una Acción]]"
 related:
   - "[[03 - Algoritmos/Stashes en el Gráfico]]"

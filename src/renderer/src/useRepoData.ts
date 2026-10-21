@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Commit, GraphFilter, Ref, Remote, RepoState, StashEntry, WorkingStatus } from '../../shared/types'
+import type { Commit, GraphFilter, LfsInfo, Ref, Remote, RepoState, StashEntry, WorkingStatus, Worktree } from '../../shared/types'
 import { api, bridge } from './api'
 
 const PAGE = 2000
@@ -12,6 +12,8 @@ export interface RepoData {
   status: WorkingStatus
   stashes: StashEntry[]
   submodules: string[]
+  worktrees: Worktree[]
+  lfs: LfsInfo | null
   loaded: boolean
   error: string | null
   limit: number
@@ -32,6 +34,8 @@ export function useRepoData(repo: string, filter: GraphFilter = NO_FILTER) {
     status: EMPTY_STATUS,
     stashes: [],
     submodules: [],
+    worktrees: [],
+    lfs: null,
     loaded: false,
     error: null,
     limit: PAGE,
@@ -48,17 +52,20 @@ export function useRepoData(repo: string, filter: GraphFilter = NO_FILTER) {
     const id = ++allSeq.current
     statusSeq.current++
     try {
-      const [refs, state, status, stashes, commits, submodules, remotes] = await Promise.all([
+      const [refs, state, status, stashes, commits, submodules, remotes, worktrees, lfs] = await Promise.all([
         api.getRefs(repo),
         api.getRepoState(repo),
         api.getStatus(repo),
         api.getStashes(repo),
         api.getLog(repo, limit.current, filterRef.current),
         api.getSubmodules(repo),
-        api.getRemotes(repo)
+        api.getRemotes(repo),
+        // Secundarios: si fallan no deben impedir abrir el repo
+        api.getWorktrees(repo).catch(() => []),
+        api.getLfsInfo(repo).catch(() => null)
       ])
       if (id !== allSeq.current) return
-      setData((d) => ({ ...d, refs, remotes, state, status, stashes, commits, submodules, loaded: true, error: null, limit: limit.current, statusVersion: d.statusVersion + 1 }))
+      setData((d) => ({ ...d, refs, remotes, state, status, stashes, commits, submodules, worktrees, lfs, loaded: true, error: null, limit: limit.current, statusVersion: d.statusVersion + 1 }))
     } catch (error) {
       if (id !== allSeq.current) return
       setData((d) => ({ ...d, loaded: true, error: error instanceof Error ? error.message : String(error) }))
