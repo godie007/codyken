@@ -14,7 +14,7 @@ related:
 
 | Área | Limitación |
 |---|---|
-| Plataforma | Desarrollado y probado en macOS; *Abrir en Terminal* usa `open -a Terminal`. Sin empaquetado `.dmg` todavía |
+| Plataforma | Desarrollado y probado en macOS; *Abrir en Terminal* usa `open -a Terminal`. La app instalable (`npm run install:mac`) solo es para Apple Silicon y lleva firma ad hoc: sirve en tu Mac, pero para repartirla haría falta firmarla con certificado de Apple y notarizarla. Los procesos auxiliares se llaman *Electron Helper* en el Monitor de Actividad |
 | Deshacer / rehacer | La pila vive en memoria de la pestaña (máx. 20). No cubre descartar, eliminar stash, push (tampoco el de arrastrar y soltar) ni borrar ramas del servidor |
 | ⌘Z / ⇧⌘Z | Solo se probaron con el botón y con eventos simulados; falta confirmar el teclado físico con el menú Edición nativo |
 | Gráfico | Máximo 8 carriles visibles (los demás se recortan). Un stash cuya base no está cargada no se dibuja |

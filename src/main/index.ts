@@ -196,7 +196,24 @@ ipcMain.handle('codyken:api', async (event, method: string, args: unknown[]): Pr
 function setAppMenu(): void {
   const isMac = process.platform === 'darwin'
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' } as MenuItemConstructorOptions] : []),
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about', label: `Acerca de ${app.name}` },
+              { type: 'separator' },
+              { role: 'services', label: 'Servicios' },
+              { type: 'separator' },
+              { role: 'hide', label: `Ocultar ${app.name}` },
+              { role: 'hideOthers', label: 'Ocultar otros' },
+              { role: 'unhide', label: 'Mostrar todo' },
+              { type: 'separator' },
+              { role: 'quit', label: `Salir de ${app.name}` }
+            ]
+          } as MenuItemConstructorOptions
+        ]
+      : []),
     { role: 'editMenu', label: 'Edición' },
     {
       label: 'Ver',
@@ -277,9 +294,13 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   app.setName('Codyken')
-  // Sin empaquetar, macOS muestra el icono de Electron en el Dock: se reemplaza al arrancar
-  const icon = appIcon()
-  if (process.platform === 'darwin' && !icon.isEmpty()) app.dock?.setIcon(icon)
+  app.setAboutPanelOptions({ applicationName: 'Codyken', applicationVersion: app.getVersion(), version: '', copyright: 'Cliente Git de escritorio' })
+  // Sin empaquetar, macOS muestra el icono de Electron en el Dock: se reemplaza al arrancar.
+  // Empaquetada usa el .icns del bundle (scripts/package-mac.sh)
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    const icon = appIcon()
+    if (!icon.isEmpty()) app.dock?.setIcon(icon)
+  }
   const open = snapshotPath ? process.env.CODYKEN_OPEN : undefined
   if (open) {
     const root = await remember(await gitOps.resolveRepo(open))

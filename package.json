@@ -5,11 +5,14 @@
   "description": "Codyken: cliente Git de escritorio",
   "main": "out/main/index.js",
   "scripts": {
+    "predev": "bash scripts/dev-name.sh",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package:mac": "bash scripts/package-mac.sh",
+    "install:mac": "bash scripts/package-mac.sh --install"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

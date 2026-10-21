@@ -10,6 +10,16 @@ up: "[[00 - Inicio]]"
 
 # 📝 Historial de Cambios
 
+## 2026-10-20 — App de macOS instalable
+
+### Nuevo
+- **`npm run install:mac`** genera `Codyken.app` (nombre, icono del hongo, versión y firma ad hoc) con el Electron de `node_modules` y herramientas del sistema, sin dependencias nuevas, y la mueve a `/Applications`. `npm run package:mac` solo la genera en `dist/` ([[Desarrollo#App instalada en macOS]]).
+
+### Cambios y arreglos
+- El menú de la app, el Dock y ⌘Tab decían **Electron**: ahora dicen **Codyken**, también en `npm run dev` (`scripts/dev-name.sh`).
+- Menú de la app en español: *Acerca de Codyken*, *Servicios*, *Ocultar Codyken*, *Ocultar otros*, *Mostrar todo*, *Salir de Codyken*.
+- Empaquetada, el Dock usa el `.icns` del bundle; `app.dock.setIcon` solo se aplica en desarrollo.
+
 ## 2026-10-20 — Quitar y preparar líneas en cualquier archivo
 
 ### Nuevo

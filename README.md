@@ -207,6 +207,16 @@ npm run dev
 | `npm start` | Abre la versión compilada |
 | `npm test` | Tests con vitest: gráfico, diffs, staging parcial, conflictos, arrastrar y soltar, rebase, worktrees y git real |
 | `npm run typecheck` | TypeScript estricto en los dos proyectos (node y web) |
+| `npm run install:mac` | Genera `Codyken.app` y la instala en `/Applications` (ver abajo) |
+| `npm run package:mac` | Solo genera `dist/Codyken.app` |
+
+### Instalar en macOS
+
+```bash
+npm run install:mac
+```
+
+Genera la app (nombre, icono y firma ad hoc) a partir del Electron de `node_modules`, **sin instalar nada más**, y la deja en `/Applications`: sale en Launchpad y Spotlight y se puede fijar en el Dock. Comparte ajustes y repositorios recientes con `npm run dev`. Para actualizarla, cierra Codyken (⌘Q) y vuelve a ejecutar el comando. La firma es ad hoc: vale para tu Mac; para repartirla a otros haría falta firmarla con un certificado de Apple y notarizarla.
 
 <details>
 <summary><strong>Modo captura (para documentación)</strong></summary>
@@ -276,4 +286,5 @@ La documentación técnica completa vive en la bóveda de Obsidian [`codyken-obs
 - [x] Editor de conflictos de tres paneles
 - [x] Editor de archivos y edición de la versión preparada línea a línea
 - [ ] Terminal integrada
-- [ ] Empaquetado `.dmg` firmado
+- [x] App de macOS instalable (`npm run install:mac`)
+- [ ] `.dmg` firmado con certificado de Apple y notarizado
