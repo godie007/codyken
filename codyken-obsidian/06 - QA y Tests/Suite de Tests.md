@@ -15,7 +15,7 @@ related:
 # 🧪 Suite de Tests
 
 ```bash
-npm test          # vitest run — 66 tests en 8 archivos
+npm test          # vitest run — 98 tests en 11 archivos
 npm run typecheck # tsc de main/preload/lib/tests y del renderer
 ```
 
@@ -30,6 +30,11 @@ Los tests de git crean repos reales en una carpeta temporal y los borran al term
 | el nodo WIP dibuja trazos punteados hasta HEAD aunque HEAD no sea la primera fila | punteado del WIP |
 | la rama actual va en el carril 0 aunque haya commits más nuevos en otras ramas | carril reservado y carril fantasma sin dibujo arriba |
 | sin primary visible no reserva carril | no deja un hueco vacío |
+| HEAD arriba del todo no tiene una línea que suba | sin tramo de entrada en el carril reservado |
+| tampoco el WIP, y su trazo punteado sí baja hasta HEAD | WIP sin línea hacia arriba |
+| HEAD más abajo, con ramas más nuevas encima: no hay tramo fantasma sobre HEAD | carril fantasma en la fila de HEAD |
+| pone cada stash justo encima de su commit aunque sea mucho más reciente | `withStashes` |
+| el stash cuelga de su base en un carril corto | carril y punteado del stash |
 
 ## `tests/diff-patch.test.ts` — [[03 - Algoritmos/Diff y Staging Parcial|diff y parches]]
 
@@ -57,6 +62,7 @@ Los tests de git crean repos reales en una carpeta temporal y los borran al term
 | blame atribuye cada línea a su commit | `getBlame` |
 | extrae el servidor del remoto | `getRemotes` |
 | quita el hash de los stashes automáticos y el prefijo de los con nombre | `stashLabel` |
+| carga la base de un stash cuya rama ya no existe, sin deshacer el filtro de ramas ocultas | bases huérfanas en `getLog` |
 
 ## `tests/recent.test.ts` — [[04 - Interfaz/Repositorios Recientes|repositorios recientes]]
 
@@ -126,6 +132,47 @@ Los tests de git crean repos reales en una carpeta temporal y los borran al term
 | omite los commits que ya están en la base como cherry-pick | `--cherry-pick --right-only` |
 | deja el mensaje como lo escribiría git | `merge` con referencia completa |
 | adelanta las ramas locales atrasadas y deja las divergentes, la actual y las de otros worktrees | `fetch`: fast-forward de las atrasadas, `diverged`, `skipped` por worktree y la actual solo con `updateCurrent` |
+
+## `tests/editor.test.ts` — [[02 - Capa Git/Operaciones de Escritura#Editar archivos|editar archivos]] con git real
+
+| Test | Verifica |
+|---|---|
+| lee el archivo con el índice como comparación y lo guarda | `readEditable` / `writeEditable` modo `working`; el índice no cambia |
+| no pisa un archivo que cambió desde que se abrió, salvo que se fuerce | `{ ok: false, changed: true }` y `force` |
+| conserva los permisos de ejecución al guardar | escribe encima del mismo archivo |
+| un archivo nuevo sin seguir no tiene comparación | `baseline: null` |
+| rechaza binarios, otras codificaciones, rutas fuera del repo, .git y enlaces | también una carpeta enlazada fuera del repo al escribir |
+| propone el contenido del commit y al guardar queda como cambio sin preparar | `rev`: `proposed` = archivo en el commit; tras guardar, `M` sin preparar y nada en el índice |
+| avisa si el archivo no existía en ese commit y rechaza revisiones raras | error claro y `assertArg` contra `--output=…` |
+| lee el índice con HEAD como comparación y guarda sin tocar el archivo de trabajo | modo `index`: `hash-object` + `update-index` |
+| no pisa la versión preparada si cambió entretanto | huella del blob |
+| propone el índice con las líneas elegidas sin cambiar el índice real | `proposed` con `buildHunkPatch` sobre una copia del índice; luego se ajusta y se prepara |
+| también sirve con las líneas de un archivo sin seguir, y lo prepara con su modo | entrada nueva con `100755` |
+| rechaza archivos en conflicto | lectura y escritura durante un merge con conflicto |
+
+## `tests/linediff.test.ts` — marcas del [[04 - Interfaz/Editor de Archivos|editor]]
+
+| Test | Verifica |
+|---|---|
+| da el diff más corto | Myers: 5 ediciones en el ejemplo clásico |
+| funciona con textos vacíos y con iguales | casos límite |
+| es correcto con cambios aleatorios | 200 pares aleatorios: las operaciones reconstruyen el texto nuevo |
+| con demasiadas diferencias marca todo el tramo del medio | límite de 1000 ediciones |
+| distingue líneas cambiadas, añadidas y borradas | `lineMarks` |
+| marca un borrado al final del archivo | `deletedBefore` al final |
+
+## `tests/editing.test.ts` — edición de texto
+
+| Test | Verifica |
+|---|---|
+| detecta tabuladores, 2 y 4 espacios | `detectIndent` |
+| detecta CRLF por mayoría | `detectEol` |
+| inserta la sangría en el cursor | `indentEdit` sin selección |
+| sangra y quita sangría a las líneas seleccionadas y las deja seleccionadas | Tab / ⇧Tab simétricos |
+| una selección que acaba al principio de una línea no la incluye | como los editores habituales |
+| Mayús+Tab en una línea quita una unidad y mueve el cursor | cursor tras quitar sangría |
+| mantiene la sangría de la línea | `newlineEdit` |
+| convierte posiciones | `lineColumn`, `offsetOfLine` |
 
 > [!note] Lo que no cubren
 > `gh`, `glab` y `git-lfs` no se ejecutan en los tests (solo sus parsers). `gh` se probó a mano; `glab` y `git-lfs` no estaban instalados ([[Limitaciones Conocidas]]).

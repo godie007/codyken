@@ -27,4 +27,5 @@ related:
 | Pull requests | Se crean en la web del proveedor (Codyken abre la página prellenada); solo se mira el remoto `origin` (o el primero) |
 | Credenciales | No pide usuario/clave: dependen del llavero, agente SSH o `gh` |
 | Etiquetas | Recrear una etiqueta eliminada (Deshacer) la crea ligera, sin el mensaje de la anotada |
+| Editor de archivos | Sin ajuste de líneas largas ni buscar/reemplazar. Solo texto UTF‑8 de hasta 2 MB; sin colores por encima de 200 000 caracteres. Con finales de línea mezclados guarda todo con el mayoritario. Lo no guardado sobrevive a cambiar de pestaña, pero no a cerrar la app |
 | Tests de UI | Los componentes no tienen tests automáticos; se verifican con capturas |

@@ -170,6 +170,26 @@ export interface ConflictVersions {
   binary: boolean
 }
 
+/** Qué se edita: el archivo en disco o la versión preparada (el índice), que es la que entra en el commit */
+export type EditTarget = 'working' | 'index'
+
+export interface EditableFile {
+  path: string
+  target: EditTarget
+  /** Lo que hay guardado ahora en ese lugar */
+  content: string
+  /** Contra qué se marcan las líneas cambiadas: el índice para el archivo de trabajo, HEAD para la versión preparada. null si allí no existe. */
+  baseline: string | null
+  /** Huella de lo guardado (sha1 del archivo o hash del blob del índice) para no pisar cambios hechos por otro */
+  version: string
+  /** Contenido propuesto para editar: la versión preparada con las líneas elegidas en el diff, o el archivo tal como estaba en un commit */
+  proposed?: string
+  /** Todavía no existe en ese lugar (archivo borrado o nuevo sin preparar) */
+  missing: boolean
+}
+
+export type EditSaveResult = { ok: true; version: string } | { ok: false; changed: true }
+
 /** Lo que hizo un fetch además de traer las ramas remotas */
 export interface FetchResult {
   /** Ramas locales que solo estaban atrasadas y se adelantaron (fast-forward) hasta su remota */
@@ -321,6 +341,9 @@ export interface Api {
   resolveConflict(repo: string, path: string, side: 'ours' | 'theirs'): Promise<void>
   commit(repo: string, message: string, amend: boolean): Promise<void>
   saveConflictResolution(repo: string, path: string, content: string): Promise<void>
+  readEditable(repo: string, path: string, target: EditTarget, patch?: string, rev?: string): Promise<EditableFile>
+  /** Guarda si lo guardado sigue siendo `version`, o siempre con `force` */
+  writeEditable(repo: string, path: string, target: EditTarget, content: string, version: string, force?: boolean): Promise<EditSaveResult>
 
   checkout(repo: string, target: CheckoutTarget): Promise<void>
   createBranch(repo: string, name: string, start: string, checkout: boolean): Promise<void>

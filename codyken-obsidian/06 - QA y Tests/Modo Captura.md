@@ -30,6 +30,8 @@ CODYKEN_SNAPSHOT=/ruta/foto.png CODYKEN_OPEN=/ruta/repo npx electron .
 | `CODYKEN_SNAPSHOT_CONFIRM` | — | Con `1`, los diálogos de confirmación (`confirm`) se aceptan solos |
 | `CODYKEN_SNAPSHOT_MENU` | — | Los menús contextuales no se abren: se imprime en la consola `[menu] [...]` con sus opciones (las deshabilitadas entre paréntesis) y se elige la primera habilitada cuya etiqueta **contenga** ese texto (ninguna si no coincide, p. ej. `-`) |
 
+La consola del renderer (`console.log` y errores) se imprime en stdout como `[renderer] …`, así un script puede devolver lo que comprobó y se ven los errores de React sin abrir las DevTools.
+
 Usa su propia carpeta de ajustes (`$TMPDIR/codyken-snapshot`), así que **no toca tus pestañas ni filtros**. Esa carpeta persiste entre corridas: un filtro de ramas activado en una captura sigue en la siguiente (los scripts de ejemplo empiezan pulsando *Mostrar todas*).
 
 ## Ejemplo de script

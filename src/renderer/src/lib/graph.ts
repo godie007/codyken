@@ -1,4 +1,25 @@
+import type { Commit, StashEntry } from '../../../shared/types'
+
 export const WIP_HASH = '__wip__'
+
+/**
+ * Intercala cada stash como un commit justo encima del commit en el que se guardó (el más nuevo arriba),
+ * así cuelga de él en un carril corto. Los stashes cuya base no está cargada no se dibujan.
+ */
+export function withStashes(commits: Commit[], stashes: StashEntry[]): Commit[] {
+  if (!stashes.length) return commits
+  const position = new Map(commits.map((c, i) => [c.hash, i]))
+  const inserts = new Map<number, Commit[]>()
+  for (const s of stashes) {
+    const at = position.get(s.base)
+    if (at === undefined) continue
+    const list = inserts.get(at) ?? []
+    list.push({ hash: s.hash, parents: [s.base], author: s.author, email: s.email, date: s.date, subject: s.message || `stash@{${s.index}}`, stash: s.index })
+    inserts.set(at, list)
+  }
+  if (!inserts.size) return commits
+  return commits.flatMap((c, i) => [...(inserts.get(i)?.sort((a, b) => b.date - a.date) ?? []), c])
+}
 
 export interface GraphNode {
   hash: string
@@ -73,6 +94,8 @@ export function computeGraph(nodes: GraphNode[], primary?: string | null): Graph
 
     before.forEach((hash, i) => {
       if (hash !== node.hash) return
+      // El carril reservado no viene de ningún hijo: sin esto HEAD (o WIP) tendría una línea que sube a la nada
+      if (i === 0 && hash === rowPhantom) return
       segments.push({ x1: i, y1: 0, x2: lane, y2: 0.5, color: beforeColors[i], dashed: beforeDashed.has(i) })
       dashedLanes.delete(i)
     })

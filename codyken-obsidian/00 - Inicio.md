@@ -45,7 +45,7 @@ aliases:
 
 - [[02 - Capa Git/Ejecución de git|Ejecución de git]] — cómo se lanza `git`, entorno y validación de argumentos
 - [[02 - Capa Git/Lectura del Repositorio|Lectura del repositorio]] — log, refs, estado, status, stashes, diff, historial, blame
-- [[02 - Capa Git/Operaciones de Escritura|Operaciones de escritura]] — staging, commit, ramas, rebase interactivo, push de una rama, worktrees, LFS, stash, conflictos
+- [[02 - Capa Git/Operaciones de Escritura|Operaciones de escritura]] — staging, edición de archivos y del índice, commit, ramas, rebase interactivo, push de una rama, worktrees, LFS, stash, conflictos
 - [[02 - Capa Git/Vigilancia y Refresco|Vigilancia y refresco]] — `fs.watch` y recarga de datos
 - [[02 - Capa Git/Ajustes Persistentes|Ajustes persistentes]] — `settings.json`
 
@@ -66,12 +66,14 @@ aliases:
 - [[04 - Interfaz/Panel Izquierdo|Panel izquierdo]]
 - [[04 - Interfaz/Panel Derecho|Panel derecho]]
 - [[04 - Interfaz/Diff, Historial y Blame|Diff, historial y blame]]
+- [[04 - Interfaz/Editor de Archivos|Editor de archivos]] — textarea sobre el resaltado, marcas del margen, cambios externos
 - [[04 - Interfaz/Paleta y Atajos|Paleta y atajos]]
 - [[04 - Interfaz/Tema Monokai|Tema Monokai]]
 
 ## 🔁 05 — Flujos de trabajo
 
 - [[05 - Flujos de Trabajo/Commit por Líneas|Commit por líneas]]
+- [[05 - Flujos de Trabajo/Editar Archivos|Editar archivos]] — el archivo, la versión preparada y retocar líneas antes de prepararlas
 - [[05 - Flujos de Trabajo/Sincronizar con el Remoto|Sincronizar con el remoto]]
 - [[05 - Flujos de Trabajo/Ramas y Merge|Ramas, merge y rebase]]
 - [[05 - Flujos de Trabajo/Arrastrar y Soltar Ramas|Arrastrar y soltar ramas]] — fast-forward, merge, rebase, push y PR soltando una rama sobre otra

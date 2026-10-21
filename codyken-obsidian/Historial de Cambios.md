@@ -10,7 +10,7 @@ up: "[[00 - Inicio]]"
 
 # 📝 Historial de Cambios
 
-## 2026-10-20 — Rehacer, rebase interactivo, comparar, arrastrar y soltar, PRs, worktrees, LFS y conflictos
+## 2026-10-20 — Rehacer, rebase interactivo, comparar, arrastrar y soltar, PRs, worktrees, LFS, conflictos y editor
 
 ### Nuevo
 - **Rehacer** (⇧⌘Z, botón en la barra y paleta): todo lo que se deshace se puede rehacer; una acción nueva vacía la pila ([[03 - Algoritmos/Pila de Deshacer]]).
@@ -20,10 +20,14 @@ up: "[[00 - Inicio]]"
 - **Pull requests / merge requests** de GitHub y GitLab con `gh` / `glab`: listar, abrir, comparar, checkout y crear ([[05 - Flujos de Trabajo/Pull Requests]]).
 - **Worktrees** y **Git LFS** en el panel izquierdo ([[05 - Flujos de Trabajo/Worktrees y LFS]]).
 - **Editor de conflictos de tres paneles**: HEAD y entrante alineados, resultado editable y *Guardar y resolver* ([[05 - Flujos de Trabajo/Resolver Conflictos]]).
-- Modo captura: `CODYKEN_SNAPSHOT_CONFIRM` y `CODYKEN_SNAPSHOT_MENU` para automatizar diálogos y menús ([[06 - QA y Tests/Modo Captura]]).
-- Tests: de 26 a **66** (nuevos `features`, `conflict`, `branches`, `drop`; `recent` ya existía) ([[06 - QA y Tests/Suite de Tests]]).
+- **Editor de archivos**: editar el archivo o la **versión preparada** (lo que entra en el commit, sin tocar el disco) con resaltado, marcas de cambios en el margen, ⌘S, ⌘G y sangría con Tab; **Editar y preparar…** abre las líneas elegidas sobre lo preparado para retocarlas antes de prepararlas; desde los archivos de un commit, **Editar archivo con la versión de…** abre tu archivo con el contenido de ese commit y al guardar queda en *Sin preparar*. No pisa cambios hechos por fuera ([[05 - Flujos de Trabajo/Editar Archivos]], [[04 - Interfaz/Editor de Archivos]]).
+- Modo captura: `CODYKEN_SNAPSHOT_CONFIRM` y `CODYKEN_SNAPSHOT_MENU` para automatizar diálogos y menús, y la consola del renderer en stdout ([[06 - QA y Tests/Modo Captura]]).
+- Tests: de 26 a **98** (nuevos `features`, `conflict`, `branches`, `drop`, `editor`, `linediff`, `editing`; `recent` ya existía) ([[06 - QA y Tests/Suite de Tests]]).
 
 ### Cambios y arreglos
+- En la barra del diff, *Historial* y *Blame* pasan a botones de icono para dejar sitio a *Editar*.
+- **La cabecera del gráfico ya no tiene una línea que sube**: el carril reservado para HEAD/WIP dibujaba un tramo de entrada aunque no hubiera nada encima ([[03 - Algoritmos/Gráfico de Carriles]]).
+- **Los stashes se ven donde estaban los cambios**: justo encima de su commit base (antes por fecha, a veces muy lejos) y también los de ramas borradas o rebaseadas, cuya base no se cargaba. Doble clic aplica ([[03 - Algoritmos/Stashes en el Gráfico]]).
 - **Fetch adelanta las ramas locales atrasadas**: antes solo actualizaba `origin/…` y las locales quedaban atrás (`↓n`) aunque hicieras fetch. Ahora las que no tienen commits propios se ponen al día; las divergentes se avisan y el cambio se deshace con ⌘Z ([[05 - Flujos de Trabajo/Sincronizar con el Remoto]]).
 - **Antes no se podía soltar una rama sobre una remota** (solo sobre filas con rama local); ahora cualquier etiqueta de rama es destino.
 - **Una rama igual en local y en remoto se ve una sola vez**: en el gráfico se une también por la rama que sigue (no solo por el nombre) y en el panel *Remoto* las iguales se agrupan en *n iguales a su rama local* ([[03 - Algoritmos/Etiquetas de Ramas]]).

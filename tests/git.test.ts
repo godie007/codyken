@@ -81,3 +81,41 @@ describe('stashLabel', () => {
     expect(stashLabel('On dev: antes de publicar')).toBe('antes de publicar')
   })
 })
+
+describe('getLog y stashes', () => {
+  it('carga la base de un stash cuya rama ya no existe, sin deshacer el filtro de ramas ocultas', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'codyken-stash-'))
+    const run = (...args: string[]): string => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
+    const save = (file: string, content: string, message: string): void => {
+      writeFileSync(join(repo, file), content)
+      run('add', '-A')
+      run('-c', 'user.name=Ana', '-c', 'user.email=a@x.co', 'commit', '-q', '-m', message)
+    }
+    const stash = (): void => void run('-c', 'user.name=Ana', '-c', 'user.email=a@x.co', 'stash', 'push', '-q')
+    try {
+      run('init', '-q', '-b', 'main')
+      save('a.txt', 'a\n', 'inicio')
+      run('checkout', '-q', '-b', 'borrada')
+      save('b.txt', 'b\n', 'base huérfana')
+      writeFileSync(join(repo, 'b.txt'), 'cambio\n')
+      stash()
+      run('checkout', '-q', 'main')
+      run('branch', '-q', '-D', 'borrada')
+      run('checkout', '-q', '-b', 'oculta')
+      save('c.txt', 'c\n', 'en la oculta')
+      writeFileSync(join(repo, 'c.txt'), 'cambio\n')
+      stash()
+      run('checkout', '-q', 'main')
+
+      const all = (await getLog(repo, 50)).map((c) => c.subject)
+      expect(all).toContain('base huérfana')
+      expect(all).toContain('en la oculta')
+      const filtered = (await getLog(repo, 50, { hidden: ['refs/heads/oculta'], solo: [] })).map((c) => c.subject)
+      expect(filtered).toContain('base huérfana')
+      expect(filtered).not.toContain('en la oculta')
+      expect(all.some((s) => s.startsWith('WIP on') || s.startsWith('index on'))).toBe(false)
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  })
+})

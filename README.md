@@ -13,7 +13,7 @@ Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales,
 ![React](https://img.shields.io/badge/React-19-2b2e3a?logo=react&logoColor=61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-2b2e3a?logo=typescript&logoColor=3178c6)
 ![Plataforma](https://img.shields.io/badge/plataforma-macOS-2b2e3a?logo=apple&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-66%20en%20verde-a6e22e)
+![Tests](https://img.shields.io/badge/tests-98%20en%20verde-a6e22e)
 
 [Características](#-características) · [Empezar](#-empezar) · [Atajos](#️-atajos) · [Arquitectura](#️-arquitectura) · [Documentación](#-documentación)
 
@@ -41,7 +41,7 @@ Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales,
 - Cada commit muestra las **iniciales del autor**; los merges son un punto y HEAD lleva un anillo.
 - Las **etiquetas de rama** se unen a su commit con una línea del color del carril. Si la local y su remota están en el mismo commit son **una sola etiqueta** (💻 ☁); si difieren, dos; las que solo están en el remoto, punteadas.
 - Fila **`// WIP`** con el conteo de cambios, donde puedes escribir el resumen del commit.
-- Los **stashes** aparecen como nodos cuadrados colgados del commit donde se guardaron.
+- Los **stashes** aparecen como un commit más (cuadrado punteado) **justo encima del commit donde se guardaron**, también si su rama ya no existe. Al seleccionarlo: *Aplicar*, *Aplicar y eliminar (pop)* o *Eliminar*; doble clic lo aplica.
 - Búsqueda por mensaje, autor o SHA (⌘F), columnas configurables, carga por páginas de 2000 commits y lista virtualizada.
 - **⌘‑clic** en otro commit para compararlo con el seleccionado.
 
@@ -109,6 +109,17 @@ Cada repo que abres, clonas o creas queda en una lista (hasta 50) para volver a 
 - Resumen con contador de 72 caracteres, descripción opcional y **amend**.
 
 ![Diff de app.js con resaltado de sintaxis y dos líneas seleccionadas para preparar](codyken-obsidian/Adjuntos/capturas/cambios.png)
+
+### Editar archivos y retocar lo que preparas
+
+- **Editar** en la barra del diff (o en el menú del archivo) abre el archivo en un editor con resaltado de sintaxis, números de línea y **marcas en el margen** de lo añadido (verde), cambiado (naranja) y borrado (▸ rojo) respecto a lo preparado. ⌘S guarda; *Guardar y preparar* lo deja listo para el commit.
+- **Editar la versión preparada**: lo que entra en el commit, sin tocar el archivo en disco (como `git add -e`). Arriba se alterna entre *Archivo* y *Preparado*.
+- **Editar archivo con la versión de un commit**: con un commit seleccionado, clic derecho sobre uno de sus archivos. Se abre tu archivo con el contenido que tenía en ese commit; lo ajustas y, al guardar, queda en *Sin preparar* como cualquier cambio (si tenías cambios sin preparar en ese archivo, avisa de que se reemplazan).
+- **Editar y preparar…** en un bloque del diff: elige unas líneas, ábrelas sobre la versión preparada, **retócalas** (quita un `console.log`, cambia un texto) y *Preparar esta versión*. El archivo en disco se queda como estaba.
+- Tabulador y Mayús+Tab sangran o quitan sangría a varias líneas, Enter conserva la sangría, ⌘G va a una línea y clic en el número selecciona la línea. Respeta CRLF/LF y los permisos del archivo.
+- No pisa cambios ajenos: si el archivo cambia por fuera mientras editas, avisa y te deja recargar o mantener lo tuyo; sin cambios propios, se recarga solo. Lo escrito sin guardar sobrevive a cambiar de pestaña.
+
+![Editar y preparar: la versión preparada con la línea elegida, retocada antes de prepararla](codyken-obsidian/Adjuntos/capturas/editar-preparar.png)
 
 ### Ramas: ocultar, filtrar y comparar local con remoto
 
@@ -223,6 +234,7 @@ Opcionales: `CODYKEN_SNAPSHOT_JS` (script que se ejecuta antes de la foto), `COD
 | Nueva pestaña / cerrar | ⌘T / ⌘W | | Preparar / quitar archivo abierto | S / U |
 | Ir a la pestaña N | ⌘1 … ⌘9 | | Cerrar diff, historial, blame o comparación | Esc |
 | Comparar con el seleccionado | ⌘‑clic | | Arrastrar rama sobre rama o remoto | menú de acciones |
+| Guardar en el editor | ⌘S | | Ir a una línea en el editor | ⌘G |
 
 ## 🏗️ Arquitectura
 
@@ -259,5 +271,6 @@ La documentación técnica completa vive en la bóveda de Obsidian [`codyken-obs
 - [x] Arrastrar y soltar ramas: fast-forward, merge, rebase, push y pull requests
 - [x] Pull requests de GitHub/GitLab, worktrees y LFS
 - [x] Editor de conflictos de tres paneles
+- [x] Editor de archivos y edición de la versión preparada línea a línea
 - [ ] Terminal integrada
 - [ ] Empaquetado `.dmg` firmado

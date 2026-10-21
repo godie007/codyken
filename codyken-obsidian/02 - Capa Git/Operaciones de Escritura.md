@@ -32,6 +32,21 @@ related:
 | `commit(msg, amend)` | `commit --cleanup=strip -F - [--amend]` (mensaje por stdin) |
 | `saveConflictResolution(path, contenido)` | escribe el archivo (la ruta no puede salir del repo) + `add -- path` ([[05 - Flujos de Trabajo/Resolver Conflictos]]) |
 
+## Editar archivos
+
+Para el [[04 - Interfaz/Editor de Archivos|editor]] ([[05 - Flujos de Trabajo/Editar Archivos|uso]]). `target` es `'working'` (disco) o `'index'` (versión preparada).
+
+| Función | Qué hace |
+|---|---|
+| `readEditable(path, 'working')` | lee el archivo; compara con el blob del índice (`ls-files -s` + `cat-file blob`); `version` = sha1 de los bytes |
+| `readEditable(path, 'index')` | lee el blob del índice; compara con `HEAD:path`; `version` = hash del blob |
+| `readEditable(path, 'working', undefined, rev)` | además, `proposed`: el blob de `rev:path` (falla si el archivo no existía en ese commit; `rev` pasa por `assertArg`) |
+| `readEditable(path, 'index', patch)` | además, `proposed`: copia `$(git rev-parse --git-path index)` a una carpeta temporal y, con `GIT_INDEX_FILE` apuntando a la copia, `apply --cached --recount` del parche y lectura del blob resultante. **El índice real no se toca** |
+| `writeEditable(path, 'working', texto, version, force?)` | si la sha1 actual sigue siendo `version` (o con `force`), escribe encima del mismo archivo: conserva permisos y enlaces duros |
+| `writeEditable(path, 'index', texto, version, force?)` | si el blob sigue siendo `version`: `hash-object -w --no-filters --stdin` + `update-index --add --cacheinfo modo,hash,ruta`. El modo es el de la entrada; si es nueva, `100755` o `100644` según el archivo en disco. El árbol de trabajo no cambia |
+
+Si la versión cambió, `writeEditable` devuelve `{ ok: false, changed: true }` sin escribir. Antes de leer o escribir se comprueba la ruta y el contenido ([[01 - Arquitectura/Seguridad#Ejecución de git]]): dentro del repo y fuera de `.git`, sin enlaces simbólicos, no binario, UTF‑8 que vuelve a dar los mismos bytes, como mucho 2 MB, sin conflicto (entradas de etapa 1–3), ni submódulo, ni puntero de LFS en la versión preparada. `--no-filters` porque lo que se edita ya es el contenido del índice. Tests en `tests/editor.test.ts`.
+
 ## Ramas, etiquetas e historial
 
 | Función | Comando |

@@ -23,13 +23,14 @@ Un stash en git es un commit con 2 o 3 padres: el **commit base** (HEAD cuando s
 
 Para cada `StashEntry` cuyo `base` está en los commits cargados:
 
-1. Posición por fecha: el primer commit con fecha ≤ la del stash.
-2. Nunca por debajo de su base: se usa `min(posición por fecha, posición de la base)`.
-3. Se inserta un `Commit` sintético `{ hash, parents: [base], author, email, date, subject: message, stash: index }`; si varios caen en el mismo sitio, el más nuevo primero.
+1. Posición: **justo encima de su commit base**, como si fuera un commit hijo de él (`withStashes` en `lib/graph.ts`). Antes se ubicaba por fecha y podía quedar decenas de filas por encima de su base, lejos de donde estaban los cambios.
+2. Se inserta un `Commit` sintético `{ hash, parents: [base], author, email, date, subject: message, stash: index }`; si varios caen en el mismo sitio, el más nuevo primero.
 
 `computeGraph` lo trata como el WIP: carril propio y **trazo punteado** hasta la base. `RowGraph` lo dibuja como cuadrado punteado; el mensaje va en cursiva con el icono de stash.
 
-Si la base no está cargada (otra página o rama oculta), el stash no se dibuja; sigue en el [[04 - Interfaz/Panel Izquierdo|panel izquierdo]].
+**Bases huérfanas.** Si la rama donde se guardó el stash se borró o se rebaseó, su base ya no es alcanzable desde ninguna rama ni etiqueta y `--all` no la traería. `getLog` busca esas bases (`for-each-ref --contains` vacío) y las añade al log, así el stash también aparece con la historia que lo sostiene. Las bases que siguen en alguna rama no se añaden, para no saltarse el filtro de ramas ocultas.
+
+Si la base no está cargada (más allá de la página o en una rama oculta), el stash no se dibuja; sigue en el [[04 - Interfaz/Panel Izquierdo|panel izquierdo]].
 
 ## Selección y acciones
 

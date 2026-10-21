@@ -17,7 +17,7 @@ related:
 
 ## Diff (`DiffView.tsx`)
 
-Barra superior: icono de estado, ruta, origen ("Sin preparar", "Preparado", "Commit abc1234"), acciones del archivo, modo, ajuste de líneas, **Historial**, **Blame** y cerrar (Esc).
+Barra superior: icono de estado, ruta, origen ("Sin preparar", "Preparado", "Commit abc1234"), acciones del archivo, **Editar**, modo, ajuste de líneas, **Historial** y **Blame** (iconos) y cerrar (Esc).
 
 | Modo | Qué muestra |
 |---|---|
@@ -28,6 +28,7 @@ Barra superior: icono de estado, ruta, origen ("Sin preparar", "Preparado", "Com
 - Resaltado de sintaxis Monokai y del **tramo cambiado** dentro de cada línea modificada.
 - **Selección de líneas** (sin preparar o preparado): clic en líneas `+`/`−`, Mayús+clic para un rango. Cada bloque ofrece *Preparar n líneas* / *Descartar n líneas* (o *Quitar n líneas*); sin selección actúa sobre el bloque entero.
 - Acciones de archivo: *Preparar archivo*, *Descartar archivo*, *Quitar archivo*.
+- **Editar** abre el [[04 - Interfaz/Editor de Archivos|editor]]: el archivo desde *Sin preparar*, la versión preparada desde *Preparado*. En los bloques sin preparar, **Editar y preparar…** abre la versión preparada con ese bloque (o las líneas elegidas) para retocarlo antes de prepararlo ([[05 - Flujos de Trabajo/Editar Archivos]]). En los archivos de un commit, el clic derecho ofrece *Editar archivo con la versión de…* ([[05 - Flujos de Trabajo/Editar Archivos#Recuperar la versión de un commit]]).
 - Diffs de más de 6000 líneas se cortan con botón **Mostrar todo**; los binarios muestran un aviso; el máximo absoluto es 8 MB.
 - El diff abierto sigue al archivo: si lo preparas pasa a la vista "Preparado" y viceversa.
 

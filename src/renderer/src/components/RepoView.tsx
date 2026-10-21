@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Commit, DiffSource, FetchResult, FileChange, GraphFilter, MenuItemSpec, PullMode, PullRequest, PullRequestInfo, RebaseMode, RebaseStep, Ref, RepoState, ResetMode, Settings, StashEntry, Worktree } from '../../../shared/types'
+import type { Commit, DiffSource, EditTarget, FetchResult, FileChange, GraphFilter, MenuItemSpec, PullMode, PullRequest, PullRequestInfo, RebaseMode, RebaseStep, Ref, RepoState, ResetMode, Settings, StashEntry, Worktree } from '../../../shared/types'
 import { api, mod } from '../api'
 import { homeRelative, relativeTime, repoName, shortHash } from '../lib/format'
-import { computeGraph, WIP_HASH } from '../lib/graph'
+import { computeGraph, WIP_HASH, withStashes } from '../lib/graph'
 import { planDrop, dropTargetRef, type DropAction, type DropTarget } from '../lib/drop'
 import { labelsByCommit, type RefLabel } from '../lib/refs'
 import { useRepoData } from '../useRepoData'
 import { CommandPalette, type PaletteItem } from './CommandPalette'
 import { CommitPanel, type CommitDraft, type CommitPanelActions, type CompareEnd, type Selection } from './CommitPanel'
 import { DiffView } from './DiffView'
+import { dropEditorDraft, FileEditor, type EditorRequest } from './FileEditor'
 import { BlameView, FileHistory } from './FileTools'
 import { GraphView } from './GraphView'
 import { Icon } from './Icons'
@@ -20,6 +21,8 @@ import { Toolbar } from './Toolbar'
 import { Resizer, usePrompt, useToast } from './ui'
 
 const drafts = new Map<string, CommitDraft>()
+/** Archivo abierto en el editor de cada repo, para recuperarlo al volver a su pestaña */
+const openEditors = new Map<string, EditorRequest>()
 const EMPTY_DRAFT: CommitDraft = { summary: '', body: '', amend: false }
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
@@ -90,6 +93,10 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
   /** Rebase interactivo abierto: desde un commit de la rama actual, o de `tip` sobre otra rama */
   const [rebasePlan, setRebasePlan] = useState<{ base: string; mode: RebaseMode; tip?: string; baseName?: string } | null>(null)
   const [prs, setPrs] = useState<PullRequestInfo | null>(null)
+  const [editor, setEditorState] = useState<EditorRequest | null>(() => openEditors.get(repo) ?? null)
+  const editorDirty = useRef(false)
+  /** Tras preparar una versión editada, mostrar su diff preparado en cuanto llegue el estado nuevo */
+  const followStaged = useRef<{ path: string; until: number } | null>(null)
   const [prsLoading, setPrsLoading] = useState(false)
 
   const { commits, refs, state, status, stashes } = data
@@ -100,23 +107,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
   const filterActive = filter.hidden.length > 0 || filter.solo.length > 0
   const headRef = refs.find((r) => r.type === 'local' && r.isHead)
   const labels = useMemo(() => labelsByCommit(refs, state?.detached ? head : null), [refs, state?.detached, head])
-  // Los stashes se intercalan en el gráfico justo encima de su commit base (o donde les toque por fecha)
-  const graphCommits = useMemo(() => {
-    if (!stashes.length) return commits
-    const position = new Map(commits.map((c, i) => [c.hash, i]))
-    const inserts = new Map<number, Commit[]>()
-    for (const s of stashes) {
-      const baseIndex = position.get(s.base)
-      if (baseIndex === undefined) continue
-      const byDate = commits.findIndex((c) => c.date <= s.date)
-      const at = byDate === -1 ? baseIndex : Math.min(byDate, baseIndex)
-      const list = inserts.get(at) ?? []
-      list.push({ hash: s.hash, parents: [s.base], author: s.author, email: s.email, date: s.date, subject: s.message || `stash@{${s.index}}`, stash: s.index })
-      inserts.set(at, list)
-    }
-    if (!inserts.size) return commits
-    return commits.flatMap((c, i) => [...(inserts.get(i)?.sort((a, b) => b.date - a.date) ?? []), c])
-  }, [commits, stashes])
+  const graphCommits = useMemo(() => withStashes(commits, stashes), [commits, stashes])
   const graph = useMemo(
     () => computeGraph(hasWip ? [{ hash: WIP_HASH, parents: head ? [head] : [] }, ...graphCommits] : graphCommits, hasWip ? WIP_HASH : head),
     [graphCommits, hasWip, head]
@@ -149,6 +140,12 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
 
   // Si el archivo del diff cambió de lista (se preparó, se quitó o se resolvió), seguirlo
   useEffect(() => {
+    const follow = followStaged.current
+    if (follow && data.loaded) {
+      const file = status.staged.find((f) => f.path === follow.path)
+      if (file || Date.now() > follow.until) followStaged.current = null
+      if (file) return setDiff({ kind: 'staged', path: file.path, oldPath: file.oldPath, status: file.status })
+    }
     if (!diff || diff.kind === 'commit' || !data.loaded) return
     const find = (list: FileChange[]): FileChange | undefined => list.find((f) => f.path === diff.path)
     const unstaged = find(status.unstaged)
@@ -672,7 +669,11 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
   }
 
   const activateCommit = (commit: Commit): void => {
-    if (commit.stash !== undefined) return
+    if (commit.stash !== undefined) {
+      const entry = stashes.find((s) => s.index === commit.stash)
+      if (entry) void stashApply(entry, false)
+      return
+    }
     const commitLabels = labels.get(commit.hash) ?? []
     const target = commitLabels.find((l) => l.local && !l.isHead) ?? commitLabels.find((l) => !l.local && l.remotes.length)
     if (commitLabels.some((l) => l.isHead)) return
@@ -1083,6 +1084,18 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     if (source.kind === 'unstaged') items.push({ id: 'stage', label: 'Preparar' }, { id: 'discard', label: 'Descartar cambios…' })
     if (source.kind === 'staged') items.push({ id: 'unstage', label: 'Quitar de preparados' })
     if (source.kind === 'conflict') items.push({ id: 'ours', label: 'Usar versión HEAD' }, { id: 'theirs', label: 'Usar versión entrante' }, { id: 'stage', label: 'Marcar resuelto' })
+    if (source.kind === 'unstaged' || source.kind === 'staged') {
+      items.push(
+        { type: 'separator' },
+        { id: 'edit', label: 'Editar archivo', enabled: !(source.kind === 'unstaged' && file.status === 'D') },
+        { id: 'edit-index', label: 'Editar la versión preparada', enabled: !(source.kind === 'staged' && file.status === 'D') && file.status !== '?' }
+      )
+    }
+    if (source.kind === 'commit') {
+      // Un borrado no tiene versión en ese commit: se toma la de antes de borrarlo
+      const rev = source.status === 'D' ? source.parent : source.hash
+      if (rev) items.push({ type: 'separator' }, { id: 'edit-rev', label: `Editar archivo con la versión de ${shortHash(rev)}…` })
+    }
     const committed = source.kind === 'commit' || !['?', 'A'].includes(file.status)
     items.push(
       { type: 'separator' },
@@ -1092,7 +1105,13 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       { id: 'copy', label: 'Copiar ruta' }
     )
     const id = await api.contextMenu(items)
-    if (id === 'open') setDiff(source)
+    if (id === 'open') openDiff(source)
+    else if (id === 'edit') void openEditor(file.path, 'working')
+    else if (id === 'edit-index') void openEditor(file.path, 'index')
+    else if (id === 'edit-rev' && source.kind === 'commit') {
+      const rev = (source.status === 'D' ? source.parent : source.hash)!
+      void openEditor(file.path, 'working', undefined, { rev, label: shortHash(rev) })
+    }
     else if (id === 'history') openFileTool('history', source)
     else if (id === 'blame') openFileTool('blame', source)
     else if (id === 'stage') void quick('No se pudo preparar', () => api.stage(repo, paths([file])))
@@ -1102,14 +1121,71 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     else if (id === 'copy') copy(file.path, 'Ruta')
   }
 
+  // ── Editor de archivos ───────────────────────────────────────────────────
+
+  const setEditor = (next: EditorRequest | null): void => {
+    if (next) openEditors.set(repo, next)
+    else openEditors.delete(repo)
+    editorDirty.current = false
+    setEditorState(next)
+  }
+
+  /** Cierra el editor; si hay cambios sin guardar, pregunta antes. false = el usuario prefirió seguir editando */
+  const leaveEditor = async (): Promise<boolean> => {
+    if (!editor) return true
+    if (editorDirty.current) {
+      const ok = await api.confirm({
+        message: `¿Descartar los cambios sin guardar en ${editor.path}?`,
+        detail: editor.target === 'index' ? 'La versión preparada se queda como estaba.' : 'El archivo en disco se queda como estaba.',
+        confirmLabel: 'Descartar',
+        destructive: true
+      })
+      if (!ok) return false
+      dropEditorDraft(repo, editor)
+    }
+    setEditor(null)
+    return true
+  }
+
+  const openEditor = async (path: string, target: EditTarget, patch?: string, from?: { rev: string; label: string }): Promise<void> => {
+    if (!(await leaveEditor())) return
+    setFileTool(null)
+    setEditor({ path, target, patch, rev: from?.rev, revLabel: from?.label, nonce: Date.now() })
+  }
+
+  const editorSaved = (target: EditTarget, staged: boolean): void => {
+    if (!editor) return
+    if (target === 'index') {
+      toast('success', `Preparada tu versión de ${editor.path}`, 'El archivo en disco no cambió.')
+      // De vuelta al diff, ya con lo preparado
+      followStaged.current = { path: editor.path, until: Date.now() + 5000 }
+      setEditor(null)
+    } else if (editor.rev) {
+      toast('success', `${editor.path} guardado con la versión de ${editor.revLabel ?? shortHash(editor.rev)}`, staged ? 'Y quedó preparado.' : 'Está en Sin preparar, como cualquier cambio.')
+      // Ya es un cambio normal: al volver a esta pestaña se abre el archivo, no otra vez la versión del commit
+      openEditors.set(repo, { ...editor, rev: undefined, revLabel: undefined })
+      setSelection({ kind: 'wip' })
+    } else if (staged) toast('success', `${editor.path} guardado y preparado`)
+    void refreshStatus()
+  }
+
+  const openDiff = (source: DiffSource | null): void => {
+    void leaveEditor().then((ok) => ok && setDiff(source))
+  }
+
   // ── Selección ────────────────────────────────────────────────────────────
 
   const openFileTool = (kind: FileTool['kind'], source: DiffSource): void => {
     const rev = source.kind === 'commit' ? (source.status === 'D' ? source.parent : source.hash) : null
-    setFileTool({ kind, path: source.path, rev })
+    void leaveEditor().then((ok) => ok && setFileTool({ kind, path: source.path, rev }))
   }
 
   const select = (hash: string, scroll = false, extend = false): void => {
+    if (editor) return void leaveEditor().then((ok) => ok && selectNow(hash, scroll, extend))
+    selectNow(hash, scroll, extend)
+  }
+
+  const selectNow = (hash: string, scroll: boolean, extend: boolean): void => {
     // ⌘/Ctrl+clic sobre otro commit: comparar lo que estaba seleccionado con este
     const anchor = selection?.kind === 'commit' ? selection.hash : selection?.kind === 'compare' ? selection.base.hash : null
     if (extend && anchor && hash !== WIP_HASH && !stashes.some((s) => s.hash === hash)) {
@@ -1175,6 +1251,14 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     if (cmd && e.shiftKey && key === 'o') return e.preventDefault(), setRepoMenu((open) => !open)
     // Con el desplegable de repos abierto, sus teclas son suyas
     if (repoMenu) return
+    // Con el editor abierto solo valen los atajos que no tocan el archivo ni cambian de vista sin preguntar
+    if (editor) {
+      if (cmd && !e.shiftKey && key === 'p') return e.preventDefault(), setPalette(true)
+      if (cmd && !e.shiftKey && key === 'j') return e.preventDefault(), onSettings({ leftVisible: !settings.leftVisible })
+      if (cmd && !e.shiftKey && key === 'k') return e.preventDefault(), onSettings({ rightVisible: !settings.rightVisible })
+      if (e.key === 'Escape' && !typing) return void leaveEditor()
+      return
+    }
     if (cmd && !e.shiftKey && key === 'p') return e.preventDefault(), setPalette(true)
     if (cmd && !e.shiftKey && !e.altKey && key === 'f') return e.preventDefault(), setDiff(null), setSearchFocus((n) => n + 1)
     if (cmd && e.altKey && key === 'f') return e.preventDefault(), onSettings({ leftVisible: true }), setFilterFocus((n) => n + 1)
@@ -1241,6 +1325,13 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       { id: 'unstage-all', group: 'Cambios', label: 'Quitar todo de preparados', hint: `⇧${mod}U`, icon: <Icon.Minus size={14} />, run: panelActions.unstageAll },
       { id: 'commit', group: 'Cambios', label: 'Escribir mensaje de commit', hint: `⇧${mod}M`, icon: <Icon.Commit size={14} />, run: () => (setSelection({ kind: 'wip' }), setSummaryFocus((n) => n + 1)) },
       { id: 'discard-all', group: 'Cambios', label: 'Descartar todos los cambios…', icon: <Icon.Trash size={14} />, run: () => void discardAll() },
+      ...(editor ? [{ id: 'editor-close', group: 'Editor', label: `Cerrar el editor de ${editor.path}`, hint: 'Esc', icon: <Icon.Close size={14} />, run: () => void leaveEditor() }] : []),
+      ...(!editor && (diff?.kind === 'unstaged' || diff?.kind === 'staged') && diff.status !== 'D'
+        ? [
+            { id: 'edit', group: 'Editor', label: `Editar ${diff.path}`, icon: <Icon.Edit size={14} />, run: () => void openEditor(diff.path, 'working') },
+            ...(diff.status !== '?' ? [{ id: 'edit-index', group: 'Editor', label: `Editar la versión preparada de ${diff.path}`, icon: <Icon.Edit size={14} />, run: () => void openEditor(diff.path, 'index') }] : [])
+          ]
+        : []),
       { id: 'search', group: 'Ver', label: 'Buscar commits', hint: `${mod}F`, icon: <Icon.Search size={14} />, run: () => (setDiff(null), setSearchFocus((n) => n + 1)) },
       { id: 'left', group: 'Ver', label: 'Mostrar u ocultar el panel izquierdo', hint: `${mod}J`, icon: <Icon.Panel size={14} />, run: () => onSettings({ leftVisible: !settings.leftVisible }) },
       { id: 'right', group: 'Ver', label: 'Mostrar u ocultar el panel derecho', hint: `${mod}K`, icon: <Icon.PanelRight size={14} />, run: () => onSettings({ rightVisible: !settings.rightVisible }) },
@@ -1373,7 +1464,19 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
           </>
         )}
         <main className="center">
-          {fileTool?.kind === 'history' ? (
+          {editor ? (
+            <FileEditor
+              repo={repo}
+              request={editor}
+              version={data.statusVersion}
+              onClose={() => void leaveEditor()}
+              onSwitch={(target) => void openEditor(editor.path, target)}
+              onSaved={editorSaved}
+              onDirty={(dirty) => {
+                editorDirty.current = dirty
+              }}
+            />
+          ) : fileTool?.kind === 'history' ? (
             <FileHistory
               repo={repo}
               path={fileTool.path}
@@ -1424,6 +1527,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
               onResolveConflict={(side) => void quick('No se pudo resolver', () => api.resolveConflict(repo, diff.path, side))}
               onHistory={() => openFileTool('history', diff)}
               onBlame={() => openFileTool('blame', diff)}
+              onEdit={(target, patch) => void openEditor(diff.path, target, patch)}
             />
           ) : (
             <GraphView
@@ -1469,7 +1573,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
                 draft={draft}
                 version={data.statusVersion}
                 onDraft={setDraft}
-                onOpenDiff={setDiff}
+                onOpenDiff={openDiff}
                 onSelectCommit={(hash) => select(hash, true)}
                 actions={panelActions}
                 summaryFocus={summaryFocus}

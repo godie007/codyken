@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { DiffMode, DiffSource } from '../../../shared/types'
+import type { DiffMode, DiffSource, EditTarget } from '../../../shared/types'
 import { api } from '../api'
 import { intraline, pairChangedLines, parseDiff, toSplitRows, type DiffLine, type Hunk } from '../lib/diff'
 import { shortHash } from '../lib/format'
@@ -26,6 +26,8 @@ export interface DiffViewProps {
   onResolveConflict: (side: 'ours' | 'theirs') => void
   onHistory: () => void
   onBlame: () => void
+  /** Abrir el editor: el archivo de trabajo, o la versión preparada (con `patch`, más esas líneas) */
+  onEdit?: (target: EditTarget, patch?: string) => void
   embedded?: boolean
 }
 
@@ -68,6 +70,7 @@ export function DiffView(props: DiffViewProps) {
   const hunkActions: HunkAction[] =
     source.kind === 'unstaged' && partial ? ['discard', 'stage'] : source.kind === 'staged' && partial ? ['unstage'] : []
   const selectable = hunkActions.length > 0 && mode !== 'split'
+  const editable = !!props.onEdit && (source.kind === 'unstaged' || source.kind === 'staged') && source.status !== 'D' && !file?.binary
   const lang = useMemo(() => languageFor(source.path), [source.path])
 
   const apply = async (hunkIndex: number, onlySelected: boolean, action: HunkAction): Promise<void> => {
@@ -91,6 +94,15 @@ export function DiffView(props: DiffViewProps) {
     } catch (e) {
       toast('error', 'No se pudo aplicar el cambio', e instanceof Error ? e.message : String(e))
     }
+  }
+
+  /** La versión preparada más el bloque (o las líneas elegidas) para retocarla antes de prepararla */
+  const editStaged = (hunkIndex: number, onlySelected: boolean): void => {
+    if (!file || !props.onEdit) return
+    const hunk = file.hunks[hunkIndex]
+    const selected = onlySelected && selection?.hunk === hunkIndex ? selection.lines : null
+    if (!hasChanges(hunk, selected)) return
+    props.onEdit('index', buildHunkPatch(file, hunk, selected, false))
   }
 
   const toggleLine = (hunk: number, line: number, shift: boolean): void => {
@@ -138,6 +150,11 @@ export function DiffView(props: DiffViewProps) {
               {hunkActions.map((action) => (
                 <HunkButton key={action} action={action} count={selectedHere?.size ?? 0} onClick={() => void apply(hi, !!selectedHere, action)} />
               ))}
+              {hunkActions.includes('stage') && props.onEdit && (
+                <button className="btn btn-xs" onClick={() => editStaged(hi, !!selectedHere)} title="Abre la versión preparada con estos cambios para ajustarlos antes de prepararlos">
+                  <Icon.Edit size={11} /> Editar y preparar…
+                </button>
+              )}
             </div>
           ) : null}
           {mode === 'split' ? (
@@ -183,6 +200,11 @@ export function DiffView(props: DiffViewProps) {
               </>
             )}
             {source.kind === 'staged' && <button className="btn btn-sm" onClick={props.onUnstageFile}>Quitar archivo</button>}
+            {editable && (
+              <button className="btn btn-sm" onClick={() => props.onEdit!(source.kind === 'staged' ? 'index' : 'working')} title={source.kind === 'staged' ? 'Edita la versión preparada: lo que entrará en el commit' : 'Edita el archivo'}>
+                <Icon.Edit size={13} /> Editar
+              </button>
+            )}
             <div className="segmented">
               {(['hunk', 'file', 'split'] as DiffMode[]).map((m) => (
                 <button key={m} className={mode === m ? 'active' : ''} onClick={() => props.onModeChange(m)}>
@@ -195,8 +217,8 @@ export function DiffView(props: DiffViewProps) {
             </button>
             {!props.embedded && (
               <>
-                <button className="btn btn-sm" title="Commits que cambiaron este archivo" onClick={props.onHistory}><Icon.History size={13} /> Historial</button>
-                <button className="btn btn-sm" title="Quién cambió cada línea" onClick={props.onBlame}><Icon.Blame size={13} /> Blame</button>
+                <button className="icon-btn" title="Historial: commits que cambiaron este archivo" onClick={props.onHistory}><Icon.History size={15} /></button>
+                <button className="icon-btn" title="Blame: quién cambió cada línea" onClick={props.onBlame}><Icon.Blame size={15} /></button>
               </>
             )}
           </>
@@ -206,7 +228,11 @@ export function DiffView(props: DiffViewProps) {
         </button>
       </div>
       {selectable && file && file.hunks.length > 0 && !selection && (
-        <div className="diff-hint">Consejo: haz clic en líneas añadidas o eliminadas (Mayús para un rango) para preparar solo esas líneas.</div>
+        <div className="diff-hint">
+          {source.kind === 'unstaged'
+            ? 'Consejo: haz clic en líneas añadidas o eliminadas (Mayús para un rango) para preparar solo esas líneas, o en «Editar y preparar» para retocarlas antes.'
+            : 'Consejo: haz clic en líneas añadidas o eliminadas (Mayús para un rango) para quitar solo esas líneas.'}
+        </div>
       )}
       <div className={`diff-body ${wrap ? 'wrap' : ''}`}>{body}</div>
     </div>

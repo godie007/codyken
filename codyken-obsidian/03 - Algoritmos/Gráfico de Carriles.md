@@ -43,6 +43,7 @@ Cada fila resultante es `{ lane, color, segments[] }`; un segmento va de `(x1, y
 
 - Mientras ningún commit de arriba apunte a ese carril es un **carril fantasma**: ocupa el sitio pero no se dibuja.
 - Deja de ser fantasma cuando llega el propio `primary` o cuando un merge de arriba lo usa como padre. La decisión de dibujar la línea pasante se toma con el estado **al inicio de la fila** (`rowPhantom`), para que en la fila del merge solo se dibuje desde el punto de unión.
+- En la propia fila de `primary` tampoco se dibuja el tramo de entrada desde arriba si el carril sigue fantasma: antes HEAD (o el WIP) mostraba una línea que subía hasta el borde aunque no tuviera nada encima.
 - Si `primary` no está en la lista (filtrado o más allá de la página), no se reserva nada.
 
 ## Punteados

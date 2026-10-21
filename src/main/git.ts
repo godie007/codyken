@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, relative, resolve, isAbsolute } from 'node:path'
+import { basename, dirname, join, relative, resolve, isAbsolute, sep } from 'node:path'
 import type {
   CheckoutTarget,
   BlameLine,
@@ -11,6 +12,9 @@ import type {
   Comparison,
   ConflictVersions,
   DiffSource,
+  EditableFile,
+  EditSaveResult,
+  EditTarget,
   FileChange,
   FileHistoryEntry,
   FetchResult,
@@ -61,7 +65,12 @@ interface RunOptions {
   env?: NodeJS.ProcessEnv
 }
 
-export function git(cwd: string, args: string[], options: RunOptions = {}): Promise<string> {
+export async function git(cwd: string, args: string[], options: RunOptions = {}): Promise<string> {
+  return (await gitBuffer(cwd, args, options)).toString('utf8')
+}
+
+/** Como `git`, pero devuelve los bytes tal cual (para contenido de archivos, que puede no ser UTF-8) */
+export function gitBuffer(cwd: string, args: string[], options: RunOptions = {}): Promise<Buffer> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn('git', ['-c', 'core.quotepath=false', '-c', 'color.ui=false', ...args], { cwd, env: options.env ? { ...ENV, ...options.env } : ENV })
     const out: Buffer[] = []
@@ -72,13 +81,13 @@ export function git(cwd: string, args: string[], options: RunOptions = {}): Prom
       reject(new GitError(error.code === 'ENOENT' ? 'No se encontró git. Instala las herramientas de línea de comandos de Xcode.' : error.message))
     })
     child.on('close', (code) => {
-      const stdout = Buffer.concat(out).toString('utf8')
+      const stdout = Buffer.concat(out)
       if ((options.okCodes ?? [0]).includes(code ?? -1)) {
         resolvePromise(stdout)
         return
       }
       const stderr = Buffer.concat(err).toString('utf8').trim()
-      reject(new GitError(stderr || stdout.trim() || `git ${args[0]} terminó con código ${code}`))
+      reject(new GitError(stderr || stdout.toString('utf8').trim() || `git ${args[0]} terminó con código ${code}`))
     })
     child.stdin.on('error', () => {})
     child.stdin.end(options.input ?? '')
@@ -153,7 +162,7 @@ export async function getLog(repo: string, limit: number, filter: GraphFilter = 
   // HEAD siempre se dibuja, aunque su rama esté oculta, para no perder el punto de trabajo
   const revs = filter.solo.length
     ? [...filter.solo.map(safeRef), 'HEAD']
-    : [...filter.hidden.map((ref) => `--exclude=${safeRef(ref)}`), '--exclude=refs/stash', '--all']
+    : [...filter.hidden.map((ref) => `--exclude=${safeRef(ref)}`), '--exclude=refs/stash', '--all', ...(await orphanStashBases(repo))]
   let out: string
   try {
     // Orden cronológico (respetando padres): los merges quedan junto a lo que integran y los carriles son cortos
@@ -163,6 +172,22 @@ export async function getLog(repo: string, limit: number, filter: GraphFilter = 
     throw error
   }
   return parseLog(out)
+}
+
+/**
+ * Commits base de stashes que ya no están en ninguna rama ni etiqueta (la rama se borró o se rebaseó).
+ * Se añaden al log para que esos stashes también se vean en el gráfico.
+ */
+async function orphanStashBases(repo: string): Promise<string[]> {
+  const out = await git(repo, ['stash', 'list', '--format=%P'], { okCodes: [0, 128] })
+  const bases = [...new Set(out.split('\n').map((line) => line.split(' ')[0]).filter((h) => /^[0-9a-f]{7,64}$/.test(h)))]
+  const orphan = await Promise.all(
+    bases.map(async (base) => {
+      const refs = await git(repo, ['for-each-ref', '--count=1', '--contains', base, '--format=x', 'refs/heads', 'refs/remotes', 'refs/tags'], { okCodes: [0, 129] }).catch(() => 'x')
+      return refs.trim() ? null : base
+    })
+  )
+  return orphan.filter((h): h is string => !!h)
 }
 
 function parseLog(out: string): Commit[] {
@@ -490,6 +515,162 @@ export async function saveConflictResolution(repo: string, path: string, content
   if (rel.startsWith('..') || isAbsolute(rel)) throw new GitError('Ruta fuera del repositorio')
   await writeFile(target, content, 'utf8')
   await git(repo, ['add', '--', rel])
+}
+
+// ── Editar archivos ─────────────────────────────────────────────────────────
+
+const MAX_EDIT_BYTES = 2 * 1024 * 1024
+const LFS_POINTER = 'version https://git-lfs.github.com/spec/v1'
+
+/** Ruta absoluta y relativa (con /) de un archivo editable: dentro del repo, fuera de .git y sin enlaces que saquen del repo */
+async function editablePath(repo: string, path: string): Promise<{ abs: string; rel: string }> {
+  const abs = resolve(repo, path)
+  const rel = relative(repo, abs)
+  if (!rel || rel.startsWith('..') || isAbsolute(rel)) throw new GitError('Ruta fuera del repositorio')
+  if (rel.split(sep).some((part) => part.toLowerCase() === '.git')) throw new GitError('Los archivos internos de git no se editan')
+  let dir = dirname(abs)
+  while (!existsSync(dir)) dir = dirname(dir)
+  const inside = relative(await realpath(repo), await realpath(dir))
+  if (inside.startsWith('..') || isAbsolute(inside)) throw new GitError('Ruta fuera del repositorio')
+  const info = await lstat(abs).catch(() => null)
+  if (info?.isSymbolicLink()) throw new GitError('Es un enlace simbólico: edita el archivo al que apunta.')
+  if (info?.isDirectory()) throw new GitError('Es una carpeta, no un archivo.')
+  return { abs, rel: rel.split(sep).join('/') }
+}
+
+/** Texto de un archivo, o error si no se puede editar como texto sin estropearlo */
+function editableText(bytes: Buffer, what: string): string {
+  if (bytes.length > MAX_EDIT_BYTES) throw new GitError(`${what} es demasiado grande para editarlo aquí (más de 2 MB).`)
+  if (bytes.subarray(0, 8000).includes(0)) throw new GitError(`${what} es binario: no se puede editar como texto.`)
+  const text = bytes.toString('utf8')
+  // Si no vuelve a dar los mismos bytes no es UTF-8: guardarlo cambiaría su codificación
+  if (!Buffer.from(text, 'utf8').equals(bytes)) throw new GitError(`${what} no está en UTF-8: edítalo en tu editor para no cambiar su codificación.`)
+  return text
+}
+
+const sha1 = (bytes: Buffer): string => createHash('sha1').update(bytes).digest('hex')
+
+interface IndexEntry {
+  mode: string
+  hash: string
+  stage: number
+}
+
+async function indexEntries(repo: string, rel: string, env?: NodeJS.ProcessEnv): Promise<IndexEntry[]> {
+  const out = await git(repo, ['ls-files', '-s', '-z', '--', `:(literal)${rel}`], { env })
+  return out
+    .split('\0')
+    .filter(Boolean)
+    .map((line) => {
+      const tab = line.indexOf('\t')
+      const [mode, hash, stage] = line.slice(0, tab).split(' ')
+      return { mode, hash, stage: Number(stage), path: line.slice(tab + 1) }
+    })
+    .filter((e) => e.path === rel)
+}
+
+/** La entrada del índice, si se puede editar como un archivo de texto normal */
+async function editableEntry(repo: string, rel: string): Promise<IndexEntry | null> {
+  const entries = await indexEntries(repo, rel)
+  if (entries.some((e) => e.stage > 0)) throw new GitError('El archivo está en conflicto: resuélvelo primero en el editor de conflictos.')
+  const entry = entries[0] ?? null
+  if (entry?.mode === '160000') throw new GitError('Es un submódulo, no un archivo.')
+  if (entry?.mode === '120000') throw new GitError('Es un enlace simbólico: edita el archivo al que apunta.')
+  return entry
+}
+
+async function blobText(repo: string, hash: string, what: string): Promise<string> {
+  return editableText(await gitBuffer(repo, ['cat-file', 'blob', assertArg(hash, 'Blob')]), what)
+}
+
+/** Contenido de comparación: si no se puede leer como texto (binario en HEAD, por ejemplo) simplemente no se marca nada */
+async function baselineText(repo: string, hash: string | null): Promise<string | null> {
+  if (!hash) return null
+  return blobText(repo, hash, 'La versión anterior').catch(() => null)
+}
+
+/** Versión preparada tras aplicar `patch`, calculada sobre una copia del índice: el índice real no se toca */
+async function stagedWithPatch(repo: string, rel: string, patch: string): Promise<string> {
+  const real = resolve(repo, (await git(repo, ['rev-parse', '--git-path', 'index'])).trim())
+  const dir = await mkdtemp(join(tmpdir(), 'codyken-index-'))
+  const env = { GIT_INDEX_FILE: join(dir, 'index') }
+  try {
+    if (existsSync(real)) await copyFile(real, env.GIT_INDEX_FILE)
+    await git(repo, ['apply', '--cached', '--recount', '--whitespace=nowarn', '-'], { input: patch, env })
+    const entry = (await indexEntries(repo, rel, env))[0]
+    return entry ? await blobText(repo, entry.hash, 'El archivo') : ''
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
+/** Contenido del archivo en un commit, para proponerlo como nuevo contenido del archivo de trabajo */
+async function textAtRevision(repo: string, rel: string, rev: string): Promise<string> {
+  const hash = (await git(repo, ['rev-parse', '-q', '--verify', `${assertArg(rev, 'Commit')}:${rel}`], { okCodes: [0, 1, 128] })).trim()
+  if (!hash) throw new GitError(`${rel} no existe en ${rev.slice(0, 7)}.`)
+  return blobText(repo, hash, 'Esa versión del archivo')
+}
+
+/**
+ * Con `patch` (solo en el índice): la versión preparada más esas líneas.
+ * Con `rev` (solo en el archivo de trabajo): el contenido del archivo en ese commit.
+ * Las dos cosas llegan como `proposed`; lo guardado no cambia hasta guardar.
+ */
+export async function readEditable(repo: string, path: string, target: EditTarget, patch?: string, rev?: string): Promise<EditableFile> {
+  const { abs, rel } = await editablePath(repo, path)
+  const entry = await editableEntry(repo, rel)
+  if (target === 'working') {
+    const bytes = await readFile(abs).catch((e: NodeJS.ErrnoException) => {
+      if (e.code === 'ENOENT') return null
+      throw e
+    })
+    return {
+      path: rel,
+      target,
+      content: bytes ? editableText(bytes, 'El archivo') : '',
+      baseline: await baselineText(repo, entry?.hash ?? null),
+      version: bytes ? sha1(bytes) : '',
+      proposed: rev ? await textAtRevision(repo, rel, rev) : undefined,
+      missing: !bytes
+    }
+  }
+  const content = entry ? await blobText(repo, entry.hash, 'La versión preparada') : ''
+  if (content.startsWith(LFS_POINTER)) throw new GitError('Está en Git LFS: en el índice solo hay un puntero al contenido, no el archivo.')
+  const head = (await git(repo, ['rev-parse', '-q', '--verify', `HEAD:${rel}`], { okCodes: [0, 1, 128] })).trim()
+  return {
+    path: rel,
+    target,
+    content,
+    baseline: await baselineText(repo, head || null),
+    version: entry?.hash ?? '',
+    proposed: patch ? await stagedWithPatch(repo, rel, patch) : undefined,
+    missing: !entry
+  }
+}
+
+export async function writeEditable(repo: string, path: string, target: EditTarget, content: string, version: string, force = false): Promise<EditSaveResult> {
+  const { abs, rel } = await editablePath(repo, path)
+  const bytes = Buffer.from(content, 'utf8')
+  if (bytes.length > MAX_EDIT_BYTES) throw new GitError('El contenido es demasiado grande (más de 2 MB).')
+  const entry = await editableEntry(repo, rel)
+  if (target === 'working') {
+    const current = await readFile(abs).catch(() => null)
+    if (!force && (current ? sha1(current) : '') !== version) return { ok: false, changed: true }
+    await mkdir(dirname(abs), { recursive: true })
+    // Se escribe encima del mismo archivo: conserva permisos y enlaces duros
+    await writeFile(abs, bytes)
+    return { ok: true, version: sha1(bytes) }
+  }
+  if (!force && (entry?.hash ?? '') !== version) return { ok: false, changed: true }
+  let mode = entry?.mode
+  if (!mode) {
+    const info = await stat(abs).catch(() => null)
+    mode = info && info.mode & 0o111 ? '100755' : '100644'
+  }
+  // Sin filtros: lo que se edita ya es el contenido del índice (finales de línea y filtros ya aplicados)
+  const hash = (await git(repo, ['hash-object', '-w', '--no-filters', '--stdin'], { input: content })).trim()
+  await git(repo, ['update-index', '--add', '--cacheinfo', `${mode},${hash},${rel}`])
+  return { ok: true, version: hash }
 }
 
 // ── Staging y commits ───────────────────────────────────────────────────────

@@ -90,3 +90,15 @@ up: "[[00 - Inicio]]"
 **Decisión:** después de `git fetch --all --prune`, toda rama local que solo esté atrasada respecto a su upstream se adelanta (fast-forward); la actual solo con el botón y con `merge --ff-only`. Las divergentes y las activas en otro worktree no se tocan y se avisan.
 **Motivo:** con `git fetch` a secas las ramas locales se quedaban atrás aunque el remoto estuviera al día, y parecía que el fetch no funcionaba. Un fast-forward no pierde commits (la rama no tenía nada propio), así que es seguro; aun así se deshace con ⌘Z.
 **Consecuencia:** el fetch automático no mueve la rama actual para no cambiar archivos mientras trabajas.
+
+## Editor sin dependencias: textarea sobre el resaltado
+
+**Decisión:** el editor de archivos es un `<textarea>` transparente encima de un `<pre>` resaltado con el `highlight.js` que ya usa el diff, con marcas del margen calculadas con un diff de Myers propio (`lib/linediff.ts`).
+**Motivo:** CodeMirror o Monaco añaden cientos de KB y otra forma de temas y atajos que mantener; para retocar líneas antes de un commit basta con escribir, sangrar, deshacer y ver qué cambió. El textarea da gratis la selección, el deshacer nativo, la entrada de acentos y la accesibilidad.
+**Consecuencia:** sin ajuste de líneas ni buscar/reemplazar ([[Limitaciones Conocidas]]). Si algún día hacen falta, se cambia el componente sin tocar `readEditable` / `writeEditable`.
+
+## Editar la versión preparada directamente en el índice
+
+**Decisión:** *Preparar esta versión* escribe el blob con `hash-object -w --no-filters` y lo pone en el índice con `update-index --cacheinfo`; la propuesta de *Editar y preparar…* se calcula aplicando el parche sobre una **copia** del índice (`GIT_INDEX_FILE`).
+**Motivo:** es lo que hace `git add -e`, sin editor externo ni archivos temporales en el repo, y deja el árbol de trabajo intacto: lo que no preparaste sigue en *Sin preparar*. Con la copia, abrir el editor y cerrarlo sin preparar no cambia nada.
+**Consecuencia:** cada lectura trae una huella (sha1 o hash del blob) y escribir exige que no haya cambiado, para no pisar lo que preparaste o editaste por otro lado mientras tanto.

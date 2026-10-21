@@ -23,7 +23,7 @@ related:
 
 ## Encontrarlo
 
-- En el **gráfico**: cuadrado punteado colgado del commit donde lo guardaste, con su mensaje en cursiva.
+- En el **gráfico**: cuadrado punteado justo encima del commit donde lo guardaste (aunque esa rama ya no exista), con su mensaje en cursiva. **Doble clic** lo aplica sin eliminarlo.
 - En el **panel izquierdo** → *Stashes* (clic lleva al nodo del gráfico).
 - Los automáticos se llaman "WIP en {rama}: {asunto del commit base}".
 

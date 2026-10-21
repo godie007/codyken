@@ -58,3 +58,7 @@ Búsqueda aproximada (`lib/fuzzy.ts`) sobre:
 | Zoom | ⌘+ / ⌘− / ⌘0 |
 
 Los atajos de una letra no se activan mientras escribes en un campo de texto ni con un diálogo abierto.
+
+### En el editor de archivos
+
+⌘S guarda (o prepara la versión editada), ⌘G va a una línea, Tab / ⇧Tab sangran, Enter mantiene la sangría y Esc cierra. Mientras escribes solo sigue activa ⌘P; ⌘Z deshace el texto, no la última acción de la app ([[05 - Flujos de Trabajo/Editar Archivos#Atajos del editor]]).

@@ -133,6 +133,10 @@ const handlers: Handlers = {
   resolveConflict: (_w, r, path, side) => gitOps.resolveConflict(repo(r), path, side),
   commit: (_w, r, message, amend) => gitOps.commit(repo(r), message, amend),
   saveConflictResolution: (_w, r, path, content) => gitOps.saveConflictResolution(repo(r), path, String(content)),
+  readEditable: (_w, r, path, target, patch, rev) =>
+    gitOps.readEditable(repo(r), String(path), target === 'index' ? 'index' : 'working', typeof patch === 'string' ? patch : undefined, typeof rev === 'string' ? rev : undefined),
+  writeEditable: (_w, r, path, target, content, version, force) =>
+    gitOps.writeEditable(repo(r), String(path), target === 'index' ? 'index' : 'working', String(content), String(version ?? ''), force === true),
 
   checkout: (_w, r, target) => gitOps.checkout(repo(r), target),
   createBranch: (_w, r, name, start, checkout) => gitOps.createBranch(repo(r), name, start, checkout),
@@ -246,6 +250,8 @@ function createWindow(): void {
   })
 
   if (snapshotPath) {
+    // En capturas la consola del renderer va a stdout, para ver errores sin abrir las DevTools
+    mainWindow.webContents.on('console-message', (event) => console.log(`[renderer] ${event.message}`))
     mainWindow.webContents.once('did-finish-load', () => {
       setTimeout(async () => {
         if (!mainWindow) return

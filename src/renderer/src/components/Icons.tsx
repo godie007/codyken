@@ -54,6 +54,7 @@ export const Icon = {
   Worktree: (p: IconProps) => base(<path d="M3 6h7l2 2h9v11H3zM12 12v5M12 12h4" />, p),
   PullRequest: (p: IconProps) => base(<path d="M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 9v12M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 15V8a2 2 0 0 0-2-2h-4M14 3l-3 3 3 3" />, p),
   Lfs: (p: IconProps) => base(<path d="M4 7l8-4 8 4-8 4zM4 12l8 4 8-4M4 17l8 4 8-4" />, p),
+  Edit: (p: IconProps) => base(<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4ZM13.5 6.5l4 4" />, p),
   Merge3: (p: IconProps) => base(<path d="M3 4h7v7H3zM14 4h7v7h-7zM8 14h8v7H8zM6.5 11v1.5H12V14M17.5 11v1.5H12" />, p),
   External: (p: IconProps) => base(<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />, p),
   Redo: (p: IconProps) => base(<path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3" />, p)

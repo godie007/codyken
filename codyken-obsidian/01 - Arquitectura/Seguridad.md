@@ -31,6 +31,7 @@ related:
 - Nombres de rama y etiqueta pasan por `git check-ref-format`.
 - Las refs del [[03 - Algoritmos/Filtro de Ramas|filtro del gráfico]] deben empezar por `refs/heads/`, `refs/remotes/` o `refs/tags/` y no contener `..` (`safeRef`).
 - `readWorkingFile` impide leer fuera del repositorio y limita a 8 MB; `saveConflictResolution` impide escribir fuera de él.
+- El [[04 - Interfaz/Editor de Archivos|editor]] (`readEditable` / `writeEditable`) solo trabaja dentro del repo y fuera de `.git` (ni `.git/hooks`), resuelve con `realpath` la carpeta más cercana que exista para que un enlace no lo saque del repo, rechaza enlaces simbólicos y nunca pisa un archivo o una versión preparada que cambió desde que se leyó sin confirmación.
 - `pushBranch` valida los dos nombres de rama con `check-ref-format` y que el remoto exista; los patrones de LFS no pueden empezar por `-`.
 - El rebase interactivo pasa su lista con `GIT_SEQUENCE_EDITOR="cp '<lista>'"` sobre una carpeta de `mkdtemp` (se rechaza si la ruta contiene `'`); los mensajes nuevos se leen de archivos, nunca se interpolan en la línea de comandos.
 - `gh`, `glab` y `ssh -G` también se lanzan sin shell, con límite de 30 s y sin preguntas interactivas (`integrations.ts`).
