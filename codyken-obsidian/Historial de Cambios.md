@@ -10,6 +10,21 @@ up: "[[00 - Inicio]]"
 
 # 📝 Historial de Cambios
 
+## 2026-10-20 — Quitar y preparar líneas en cualquier archivo
+
+### Nuevo
+- **Selección de líneas en varios bloques a la vez**, con una barra que resume la selección y aplica *Preparar* / *Quitar* / *Descartar* o *Editar y preparar…* a todo de una vez; **S** / **U** la aplican y **Esc** la limpia ([[04 - Interfaz/Diff, Historial y Blame]]).
+- **Vista Dividido seleccionable**: también se eligen líneas en ella.
+- **+ / − sobre el número de cada línea cambiada**: prepara o quita esa línea con un clic (o la selección entera si la línea es parte de ella).
+
+### Cambios y arreglos
+- **Quitar líneas de lo preparado en archivos nuevos, borrados y renombrados** (antes solo en modificados): las líneas quitadas vuelven a *Sin preparar* y el resto sigue preparado. Quitar todas las de un archivo nuevo lo saca del índice; en un renombrado se mantiene el renombre. También se pueden preparar o descartar líneas sueltas de archivos sin seguir y de borrados ([[03 - Algoritmos/Diff y Staging Parcial#Archivos nuevos, borrados y renombrados]]).
+- Preparar o quitar un bloque ya no arrastra el cambio de permisos del archivo.
+- Tests: **106**.
+
+### Logo nuevo
+- **Hongo nuclear con onda de choque** en vez del cuadrado verde y cian: en la barra de pestañas, la bienvenida, el README y como **icono de la app en el Dock** (antes salía el átomo de Electron). Los generan `scripts/logo.py` y `scripts/icon.cjs` ([[04 - Interfaz/Tema Monokai#Logo]]).
+
 ## 2026-10-20 — Rehacer, rebase interactivo, comparar, arrastrar y soltar, PRs, worktrees, LFS, conflictos y editor
 
 ### Nuevo

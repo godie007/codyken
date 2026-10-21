@@ -1,4 +1,5 @@
 import type { ReactNode, SVGProps } from 'react'
+import logoUrl from '../assets/logo.svg'
 
 type IconProps = SVGProps<SVGSVGElement> & { size?: number }
 
@@ -60,19 +61,7 @@ export const Icon = {
   Redo: (p: IconProps) => base(<path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3" />, p)
 }
 
+/** Hongo nuclear con onda de choque; como imagen para que sus filtros e ids no choquen con los del resto de la UI */
 export function Logo({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
-      <defs>
-        <linearGradient id="ck-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#a6e22e" />
-          <stop offset="1" stopColor="#66d9ef" />
-        </linearGradient>
-      </defs>
-      <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#ck-g)" />
-      <path d="M11 8v16M11 15c0-4 10-3 10-8M11 17c0 4 10 3 10 8" stroke="#272822" strokeWidth="2.4" strokeLinecap="round" fill="none" />
-      <circle cx="21" cy="7" r="2.4" fill="#272822" />
-      <circle cx="21" cy="25" r="2.4" fill="#272822" />
-    </svg>
-  )
+  return <img src={logoUrl} width={size} height={size} alt="" aria-hidden draggable={false} style={{ display: 'block' }} />
 }

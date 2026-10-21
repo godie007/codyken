@@ -13,7 +13,7 @@ Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales,
 ![React](https://img.shields.io/badge/React-19-2b2e3a?logo=react&logoColor=61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-2b2e3a?logo=typescript&logoColor=3178c6)
 ![Plataforma](https://img.shields.io/badge/plataforma-macOS-2b2e3a?logo=apple&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-98%20en%20verde-a6e22e)
+![Tests](https://img.shields.io/badge/tests-106%20en%20verde-a6e22e)
 
 [Características](#-características) · [Empezar](#-empezar) · [Atajos](#️-atajos) · [Arquitectura](#️-arquitectura) · [Documentación](#-documentación)
 
@@ -103,12 +103,14 @@ Cada repo que abres, clonas o creas queda en una lista (hasta 50) para volver a 
 
 ### Cambios y commit
 
-- Staging **por archivo, por bloque o por línea**: selecciona líneas (Mayús para un rango) y elige *Preparar* o *Descartar*.
+- Staging **por archivo, por bloque o por línea**, en los dos sentidos: en *Sin preparar* eliges líneas y las **preparas** (o descartas); en *Preparado* eliges líneas y las **quitas**, y vuelven a *Sin preparar*. Para una sola línea basta el **+** / **−** que aparece sobre su número al pasar el ratón. Vale en varios bloques a la vez (una barra resume la selección; **S** / **U** la aplican, Esc la limpia), en la vista *Dividido* y también en archivos **nuevos, borrados o renombrados**: quitar unas líneas de un archivo nuevo lo deja preparado sin ellas, y en un renombrado se mantiene el renombre.
 - Diff con **resaltado de sintaxis**, cambios dentro de la línea y tres vistas: Bloques, Archivo completo y Dividido.
 - Archivos en **lista o árbol de carpetas**; prepara o quita una carpeta entera de una vez.
 - Resumen con contador de 72 caracteres, descripción opcional y **amend**.
 
 ![Diff de app.js con resaltado de sintaxis y dos líneas seleccionadas para preparar](codyken-obsidian/Adjuntos/capturas/cambios.png)
+
+![Archivo nuevo preparado con dos líneas elegidas para quitarlas: volverán a Sin preparar](codyken-obsidian/Adjuntos/capturas/quitar-lineas.png)
 
 ### Editar archivos y retocar lo que preparas
 
@@ -235,6 +237,7 @@ Opcionales: `CODYKEN_SNAPSHOT_JS` (script que se ejecuta antes de la foto), `COD
 | Ir a la pestaña N | ⌘1 … ⌘9 | | Cerrar diff, historial, blame o comparación | Esc |
 | Comparar con el seleccionado | ⌘‑clic | | Arrastrar rama sobre rama o remoto | menú de acciones |
 | Guardar en el editor | ⌘S | | Ir a una línea en el editor | ⌘G |
+| Preparar / quitar las líneas elegidas | S / U | | Deseleccionar líneas | Esc |
 
 ## 🏗️ Arquitectura
 

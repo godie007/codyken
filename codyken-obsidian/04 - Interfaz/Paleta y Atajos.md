@@ -51,6 +51,7 @@ Búsqueda aproximada (`lib/fuzzy.ts`) sobre:
 | Panel izquierdo / derecho | ⌘J / ⌘K |
 | Moverse por el gráfico | ↑ ↓ o J K |
 | Preparar / quitar el archivo abierto | S / U |
+| Con líneas elegidas en el diff: prepararlas / quitarlas · deseleccionar | S / U · Esc |
 | Cerrar diff, historial, blame o la comparación | Esc |
 | Abrir repo · nueva pestaña · cerrar pestaña | ⌘O · ⌘T · ⌘W |
 | [[04 - Interfaz/Repositorios Recientes\|Repositorios recientes]] | ⇧⌘O |

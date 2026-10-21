@@ -4,7 +4,7 @@ import { api } from '../api'
 import { intraline, pairChangedLines, parseDiff, toSplitRows, type DiffLine, type Hunk } from '../lib/diff'
 import { shortHash } from '../lib/format'
 import { highlightCode, languageFor } from '../lib/highlight'
-import { buildHunkPatch, hasChanges, supportsPartialStaging } from '../lib/patch'
+import { buildPatch, supportsPartialStaging, type HunkPick } from '../lib/patch'
 import { Icon } from './Icons'
 import { StatusBadge, useToast } from './ui'
 
@@ -32,13 +32,16 @@ export interface DiffViewProps {
 }
 
 type HunkAction = 'stage' | 'unstage' | 'discard'
+/** Líneas elegidas por bloque (índice del hunk → índices de sus líneas) */
+type LineSelection = Map<number, Set<number>>
+const NONE: LineSelection = new Map()
 
 export function DiffView(props: DiffViewProps) {
   const { repo, source, mode, wrap, version } = props
   const { toast } = useToast()
   const [text, setText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [selection, setSelection] = useState<{ hunk: number; lines: Set<number> } | null>(null)
+  const [selection, setSelection] = useState<LineSelection>(NONE)
   const [showAll, setShowAll] = useState(false)
   const anchor = useRef<{ hunk: number; line: number } | null>(null)
   const sourceKey = JSON.stringify(source)
@@ -61,7 +64,7 @@ export function DiffView(props: DiffViewProps) {
   }, [repo, sourceKey, full, version])
 
   useEffect(() => {
-    setSelection(null)
+    setSelection(NONE)
     setShowAll(false)
   }, [sourceKey, version, mode])
 
@@ -69,46 +72,76 @@ export function DiffView(props: DiffViewProps) {
   const partial = !!file && supportsPartialStaging(file)
   const hunkActions: HunkAction[] =
     source.kind === 'unstaged' && partial ? ['discard', 'stage'] : source.kind === 'staged' && partial ? ['unstage'] : []
-  const selectable = hunkActions.length > 0 && mode !== 'split'
+  const selectable = hunkActions.length > 0
+  const selectedCount = useMemo(() => [...selection.values()].reduce((n, lines) => n + lines.size, 0), [selection])
   const editable = !!props.onEdit && (source.kind === 'unstaged' || source.kind === 'staged') && source.status !== 'D' && !file?.binary
   const lang = useMemo(() => languageFor(source.path), [source.path])
 
-  const apply = async (hunkIndex: number, onlySelected: boolean, action: HunkAction): Promise<void> => {
-    if (!file) return
-    const hunk = file.hunks[hunkIndex]
-    const selected = onlySelected && selection?.hunk === hunkIndex ? selection.lines : null
-    if (!hasChanges(hunk, selected)) return
+  /** Un bloque (con sus líneas elegidas, o entero si no hay) o todas las líneas elegidas en cualquier bloque */
+  const picksFor = (target: number | 'selection' | HunkPick[]): HunkPick[] =>
+    Array.isArray(target)
+      ? target
+      : target === 'selection'
+        ? [...selection].map(([hunk, lines]) => ({ hunk, lines }))
+        : [{ hunk: target, lines: selection.get(target) ?? null }]
+
+  /** Mientras se aplica un parche, el diff aún es el de antes: un segundo clic usaría números de línea viejos */
+  const applying = useRef(false)
+
+  const apply = async (target: number | 'selection' | HunkPick[], action: HunkAction): Promise<void> => {
+    if (!file || applying.current) return
+    const picks = picksFor(target)
+    const patch = buildPatch(file, picks, action !== 'stage')
+    if (!patch) return
     if (action === 'discard') {
+      const lines = picks.reduce((n, p) => n + (p.lines?.size ?? 0), 0)
       const ok = await api.confirm({
-        message: selected ? '¿Descartar las líneas seleccionadas?' : '¿Descartar este bloque de cambios?',
+        message: lines ? `¿Descartar ${lines === 1 ? 'la línea seleccionada' : `las ${lines} líneas seleccionadas`}?` : '¿Descartar este bloque de cambios?',
         detail: 'Los cambios se pierden del archivo de trabajo y no se pueden recuperar.',
         confirmLabel: 'Descartar',
         destructive: true
       })
       if (!ok) return
     }
+    applying.current = true
     try {
-      await api.applyPatch(repo, buildHunkPatch(file, hunk, selected, action !== 'stage'), action !== 'discard', action !== 'stage')
-      setSelection(null)
+      await api.applyPatch(repo, patch, action !== 'discard', action !== 'stage')
+      setSelection(NONE)
       props.onChanged()
     } catch (e) {
       toast('error', 'No se pudo aplicar el cambio', e instanceof Error ? e.message : String(e))
+    } finally {
+      applying.current = false
     }
   }
 
+  /** Botón + / − junto al número de cada línea cambiada: prepara o quita esa línea (o toda la selección, si es parte de ella) */
+  const lineAction: LineActionKind | null = hunkActions.includes('stage') ? 'stage' : hunkActions.includes('unstage') ? 'unstage' : null
+  const lineActionFor = (hunk: number): LineAction | null =>
+    lineAction && {
+      kind: lineAction,
+      run: (line) => {
+        const inSelection = !!selection.get(hunk)?.has(line)
+        void apply(inSelection ? 'selection' : [{ hunk, lines: new Set([line]) }], lineAction)
+      },
+      title: (line) => {
+        const many = selection.get(hunk)?.has(line) && selectedCount > 1
+        if (lineAction === 'stage') return many ? `Preparar las ${selectedCount} líneas seleccionadas` : 'Preparar esta línea'
+        return many ? `Quitar de lo preparado las ${selectedCount} líneas seleccionadas` : 'Quitar esta línea de lo preparado (vuelve a Sin preparar)'
+      }
+    }
+
   /** La versión preparada más el bloque (o las líneas elegidas) para retocarla antes de prepararla */
-  const editStaged = (hunkIndex: number, onlySelected: boolean): void => {
+  const editStaged = (target: number | 'selection'): void => {
     if (!file || !props.onEdit) return
-    const hunk = file.hunks[hunkIndex]
-    const selected = onlySelected && selection?.hunk === hunkIndex ? selection.lines : null
-    if (!hasChanges(hunk, selected)) return
-    props.onEdit('index', buildHunkPatch(file, hunk, selected, false))
+    const patch = buildPatch(file, picksFor(target), false)
+    if (patch) props.onEdit('index', patch)
   }
 
   const toggleLine = (hunk: number, line: number, shift: boolean): void => {
     setSelection((current) => {
-      const same = current?.hunk === hunk
-      const lines = new Set(same ? current!.lines : [])
+      const next = new Map(current)
+      const lines = new Set(next.get(hunk) ?? [])
       if (shift && anchor.current?.hunk === hunk) {
         const [a, b] = [anchor.current.line, line].sort((x, y) => x - y)
         const changeLines = file!.hunks[hunk].lines
@@ -116,9 +149,31 @@ export function DiffView(props: DiffViewProps) {
       } else if (lines.has(line)) lines.delete(line)
       else lines.add(line)
       anchor.current = { hunk, line }
-      return lines.size ? { hunk, lines } : null
+      if (lines.size) next.set(hunk, lines)
+      else next.delete(hunk)
+      return next
     })
   }
+
+  // Con líneas elegidas, S / U las preparan o quitan (en vez del archivo entero) y Esc las deselecciona
+  const selectionKeys = useRef<(e: KeyboardEvent) => void>(() => {})
+  selectionKeys.current = (e: KeyboardEvent) => {
+    if (!selectedCount || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('.modal-backdrop')) return
+    if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return
+    const key = e.key.toLowerCase()
+    if (e.key === 'Escape') setSelection(NONE)
+    else if (key === 's' && source.kind === 'unstaged') void apply('selection', 'stage')
+    else if (key === 'u' && source.kind === 'staged') void apply('selection', 'unstage')
+    else return
+    e.preventDefault()
+    e.stopPropagation()
+  }
+  useEffect(() => {
+    const listener = (e: KeyboardEvent): void => selectionKeys.current(e)
+    // En captura: llega antes que los atajos de la ventana (que prepararían el archivo entero o cerrarían el diff)
+    window.addEventListener('keydown', listener, true)
+    return () => window.removeEventListener('keydown', listener, true)
+  }, [])
 
   const label =
     source.kind === 'unstaged' ? 'Sin preparar' : source.kind === 'staged' ? 'Preparado' : source.kind === 'conflict' ? 'En conflicto' : source.label ?? `Commit ${shortHash(source.hash)}`
@@ -140,7 +195,7 @@ export function DiffView(props: DiffViewProps) {
         return
       }
       budget -= hunk.lines.length
-      const selectedHere = selection?.hunk === hi ? selection.lines : null
+      const selectedHere = selection.get(hi) ?? null
       hunks.push(
         <div className="hunk" key={hi}>
           {mode !== 'file' || hunkActions.length > 0 ? (
@@ -148,19 +203,19 @@ export function DiffView(props: DiffViewProps) {
               <span className="mono hunk-range">{mode === 'file' ? 'Archivo completo' : hunk.header}</span>
               <span className="spacer" />
               {hunkActions.map((action) => (
-                <HunkButton key={action} action={action} count={selectedHere?.size ?? 0} onClick={() => void apply(hi, !!selectedHere, action)} />
+                <HunkButton key={action} action={action} count={selectedHere?.size ?? 0} onClick={() => void apply(hi, action)} />
               ))}
               {hunkActions.includes('stage') && props.onEdit && (
-                <button className="btn btn-xs" onClick={() => editStaged(hi, !!selectedHere)} title="Abre la versión preparada con estos cambios para ajustarlos antes de prepararlos">
+                <button className="btn btn-xs" onClick={() => editStaged(hi)} title="Abre la versión preparada con estos cambios para ajustarlos antes de prepararlos">
                   <Icon.Edit size={11} /> Editar y preparar…
                 </button>
               )}
             </div>
           ) : null}
           {mode === 'split' ? (
-            <SplitHunk hunk={hunk} lang={lang} />
+            <SplitHunk hunk={hunk} lang={lang} selected={selectedHere} selectable={selectable} onToggle={(line, shift) => toggleLine(hi, line, shift)} lineAction={lineActionFor(hi)} />
           ) : (
-            <UnifiedHunk hunk={hunk} lang={lang} selected={selectedHere} selectable={selectable} onToggle={(line, shift) => toggleLine(hi, line, shift)} />
+            <UnifiedHunk hunk={hunk} lang={lang} selected={selectedHere} selectable={selectable} onToggle={(line, shift) => toggleLine(hi, line, shift)} lineAction={lineActionFor(hi)} />
           )}
         </div>
       )
@@ -227,11 +282,30 @@ export function DiffView(props: DiffViewProps) {
           <Icon.Close size={15} />
         </button>
       </div>
-      {selectable && file && file.hunks.length > 0 && !selection && (
+      {selectable && file && file.hunks.length > 0 && selectedCount === 0 && (
         <div className="diff-hint">
           {source.kind === 'unstaged'
-            ? 'Consejo: haz clic en líneas añadidas o eliminadas (Mayús para un rango) para preparar solo esas líneas, o en «Editar y preparar» para retocarlas antes.'
-            : 'Consejo: haz clic en líneas añadidas o eliminadas (Mayús para un rango) para quitar solo esas líneas.'}
+            ? 'Consejo: pulsa + junto al número de una línea para prepararla, o haz clic en varias (Mayús para un rango, en uno o varios bloques) y prepáralas juntas o retócalas con «Editar y preparar».'
+            : 'Consejo: pulsa − junto al número de una línea para quitarla de lo preparado (vuelve a Sin preparar), o haz clic en varias (Mayús para un rango) y quítalas juntas.'}
+        </div>
+      )}
+      {selectable && selectedCount > 0 && (
+        <div className="diff-selbar">
+          <span>
+            <strong>{selectedCount}</strong> {selectedCount === 1 ? 'línea seleccionada' : 'líneas seleccionadas'}
+            {selection.size > 1 ? ` en ${selection.size} bloques` : ''}
+          </span>
+          <span className="muted small">{source.kind === 'unstaged' ? 'S prepara' : 'U quita'} · Esc deselecciona</span>
+          <span className="spacer" />
+          {hunkActions.map((action) => (
+            <HunkButton key={action} action={action} count={selectedCount} onClick={() => void apply('selection', action)} />
+          ))}
+          {hunkActions.includes('stage') && props.onEdit && (
+            <button className="btn btn-xs" onClick={() => editStaged('selection')} title="Abre la versión preparada con estas líneas para ajustarlas antes de prepararlas">
+              <Icon.Edit size={11} /> Editar y preparar…
+            </button>
+          )}
+          <button className="btn btn-xs" onClick={() => setSelection(NONE)}>Deseleccionar</button>
         </div>
       )}
       <div className={`diff-body ${wrap ? 'wrap' : ''}`}>{body}</div>
@@ -268,7 +342,33 @@ function LineText({ line, pair, lang }: { line: DiffLine; pair?: DiffLine; lang:
   )
 }
 
-function UnifiedHunk({ hunk, lang, selected, selectable, onToggle }: { hunk: Hunk; lang: string | null; selected: Set<number> | null; selectable: boolean; onToggle: (line: number, shift: boolean) => void }) {
+type LineActionKind = 'stage' | 'unstage'
+
+interface LineAction {
+  kind: LineActionKind
+  run: (line: number) => void
+  title: (line: number) => string
+}
+
+/** El + / − que aparece sobre el número de línea */
+function LineButton({ action, line }: { action: LineAction | null; line: number }) {
+  if (!action) return null
+  return (
+    <button
+      className={`line-act ${action.kind}`}
+      title={action.title(line)}
+      aria-label={action.title(line)}
+      onClick={(e) => {
+        e.stopPropagation()
+        action.run(line)
+      }}
+    >
+      {action.kind === 'stage' ? '+' : '−'}
+    </button>
+  )
+}
+
+function UnifiedHunk({ hunk, lang, selected, selectable, onToggle, lineAction }: { hunk: Hunk; lang: string | null } & LinePicking) {
   const pairs = useMemo(() => pairChangedLines(hunk), [hunk])
   return (
     <div className="diff-lines">
@@ -282,6 +382,7 @@ function UnifiedHunk({ hunk, lang, selected, selectable, onToggle }: { hunk: Hun
             className={`diff-line ${line.type === '+' ? 'add' : line.type === '-' ? 'del' : ''} ${selected?.has(i) ? 'selected' : ''} ${selectable && changed ? 'selectable' : ''}`}
             onClick={(e) => selectable && changed && onToggle(i, e.shiftKey)}
           >
+            {changed && <LineButton action={lineAction} line={i} />}
             <span className="ln">{line.oldNo ?? ''}</span>
             <span className="ln">{line.newNo ?? ''}</span>
             <span className="sign">{line.type === ' ' ? '' : line.type}</span>
@@ -293,25 +394,36 @@ function UnifiedHunk({ hunk, lang, selected, selectable, onToggle }: { hunk: Hun
   )
 }
 
-function SplitHunk({ hunk, lang }: { hunk: Hunk; lang: string | null }) {
+interface LinePicking {
+  selected: Set<number> | null
+  selectable: boolean
+  onToggle: (line: number, shift: boolean) => void
+  lineAction: LineAction | null
+}
+
+function SplitHunk({ hunk, lang, ...picking }: { hunk: Hunk; lang: string | null } & LinePicking) {
   const rows = useMemo(() => toSplitRows(hunk), [hunk])
   return (
     <div className="diff-split">
       {rows.map((row, i) => (
         <Fragment key={i}>
-          <SplitCell side={row.left} other={row.right} kind="del" lang={lang} />
-          <SplitCell side={row.right} other={row.left} kind="add" lang={lang} />
+          <SplitCell side={row.left} other={row.right} kind="del" lang={lang} {...picking} />
+          <SplitCell side={row.right} other={row.left} kind="add" lang={lang} {...picking} />
         </Fragment>
       ))}
     </div>
   )
 }
 
-function SplitCell({ side, other, kind, lang }: { side?: { line: DiffLine }; other?: { line: DiffLine }; kind: 'add' | 'del'; lang: string | null }) {
+function SplitCell({ side, other, kind, lang, selected, selectable, onToggle, lineAction }: { side?: { line: DiffLine; index: number }; other?: { line: DiffLine }; kind: 'add' | 'del'; lang: string | null } & LinePicking) {
   if (!side) return <div className="diff-line empty-side"><span className="ln" /><span className="code" /></div>
   const changed = side.line.type !== ' '
   return (
-    <div className={`diff-line ${changed ? kind : ''}`}>
+    <div
+      className={`diff-line ${changed ? kind : ''} ${changed && selected?.has(side.index) ? 'selected' : ''} ${selectable && changed ? 'selectable' : ''}`}
+      onClick={(e) => selectable && changed && onToggle(side.index, e.shiftKey)}
+    >
+      {changed && <LineButton action={lineAction} line={side.index} />}
       <span className="ln">{kind === 'del' ? side.line.oldNo : side.line.newNo}</span>
       <span className="code"><LineText line={side.line} lang={lang} pair={changed && other && other.line.type !== ' ' ? other.line : undefined} /></span>
     </div>

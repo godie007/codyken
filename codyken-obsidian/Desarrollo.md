@@ -49,7 +49,11 @@ src/renderer/src/
                          CommitPanel, DiffView, FileTools, CommandPalette, RepoList,
                          Welcome, ui, Icons
   lib/                   graph, refs, diff, patch, highlight, format, fuzzy, repos
+  assets/logo.svg        logo (generado por scripts/logo.py)
   styles.css             tema Monokai
+scripts/logo.py          genera el logo (python3 scripts/logo.py)
+scripts/icon.cjs         genera resources/icon.png desde el logo (npx electron scripts/icon.cjs)
+resources/icon.png       icono de la app (Dock en macOS, ventana en Windows y Linux)
 tests/                   vitest
 codyken-obsidian/        esta bóveda (Adjuntos/capturas: imágenes del README)
 ```

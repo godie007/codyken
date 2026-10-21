@@ -60,3 +60,15 @@ Diff: añadido `rgba(166,226,46,.09)` (tramo `.30`), eliminado `rgba(249,38,114,
 ## Carriles
 
 `#66d9ef #a6e22e #f92672 #fd971f #ae81ff #e6db74 #78dce8 #ff6188 #a9dc76 #fc9867` (en `lib/graph.ts`). La fila seleccionada se tiñe con el color de su carril.
+
+## Logo
+
+![[logo.svg|120]]
+
+Un hongo nuclear al atardecer con su onda de choque: la cúpula de aire comprimido que se expande, el anillo de condensación alrededor del tallo y el frente que corre por el suelo levantando polvo. Lo genera `scripts/logo.py` (`python3 scripts/logo.py`), que escribe `src/renderer/src/assets/logo.svg` y `Adjuntos/logo.svg`; la semilla es fija, así que sale siempre igual.
+
+- **Volumen**: cientos de círculos con degradado radial (humo pardo arriba, fuego naranja abajo) y un filtro que deforma los bordes con ruido (`feTurbulence` + `feDisplacementMap`) y les da relieve iluminado (`feDiffuseLighting`). El tallo usa el mismo truco con ruido estirado en vertical.
+- **Luz**: sombra azulada del cielo arriba y a la derecha, la bola de fuego asomando bajo el sombrero (`mix-blend-mode: screen`) y su reflejo en el suelo.
+- **Icono de la app**: `npx electron scripts/icon.cjs` dibuja el logo en `resources/icon.png` (1024 px, cuadrado de 824 px centrado con sombra, como la plantilla de iconos de macOS). Al arrancar, `index.ts` lo pone en el Dock con `app.dock.setIcon` (sin esto, la app sin empaquetar muestra el átomo de Electron) y como `icon` de la ventana en Windows y Linux. Si cambias el logo, vuelve a ejecutar los dos scripts.
+- **En la app** se pinta como `<img>` (`Logo` en `Icons.tsx`): así sus filtros e ids no chocan con los SVG de la interfaz. La CSP lo permite (`img-src 'self'`).
+

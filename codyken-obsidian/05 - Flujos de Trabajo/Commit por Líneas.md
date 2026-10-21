@@ -23,9 +23,12 @@ related:
 3. Elige qué incluir:
    - todo el archivo → **Preparar archivo** (o *Preparar* en la fila, o `S` con el diff abierto);
    - un bloque → **Preparar bloque**;
+   - una línea → pasa el ratón por su número y pulsa **+**;
    - solo algunas líneas → clic en las líneas `+`/`−` (Mayús+clic para un rango) → **Preparar n líneas**;
    - unas líneas, pero cambiadas → **Editar y preparar…**: retócalas en la versión preparada sin tocar tu archivo ([[05 - Flujos de Trabajo/Editar Archivos#Retocar unas líneas antes de prepararlas]]).
-4. Revisa **Preparados**; para sacar algo: **Quitar** (o `U`), o selecciona líneas en su diff → *Quitar n líneas*.
+4. Revisa **Preparados**; para sacar algo: **Quitar** (o `U`); una línea, con el **−** sobre su número; o abre su diff, selecciona las líneas (en uno o varios bloques) y *Quitar n líneas* en la barra de selección (o `U`). Esas líneas vuelven a **Sin preparar** y el resto sigue preparado; vale también para archivos nuevos, borrados o renombrados.
+
+![[quitar-lineas.png]]
 5. Escribe el **resumen** (≤ 72 caracteres) y, si hace falta, la descripción. También puedes escribir el resumen en la fila `// WIP` del gráfico.
 6. **Hacer commit de n archivos** o ⌘Enter.
 

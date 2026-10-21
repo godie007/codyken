@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, shell, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, shell, type MenuItemConstructorOptions } from 'electron'
 import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -215,6 +215,9 @@ function setAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
+/** Icono de la app (lo genera scripts/icon.cjs a partir del logo) */
+const appIcon = (): Electron.NativeImage => nativeImage.createFromPath(join(app.getAppPath(), 'resources/icon.png'))
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -223,6 +226,7 @@ function createWindow(): void {
     minHeight: 640,
     show: false,
     title: 'Codyken',
+    icon: process.platform === 'darwin' ? undefined : appIcon(),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 14, y: 12 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0e1016' : '#f6f7fb',
@@ -273,6 +277,9 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   app.setName('Codyken')
+  // Sin empaquetar, macOS muestra el icono de Electron en el Dock: se reemplaza al arrancar
+  const icon = appIcon()
+  if (process.platform === 'darwin' && !icon.isEmpty()) app.dock?.setIcon(icon)
   const open = snapshotPath ? process.env.CODYKEN_OPEN : undefined
   if (open) {
     const root = await remember(await gitOps.resolveRepo(open))

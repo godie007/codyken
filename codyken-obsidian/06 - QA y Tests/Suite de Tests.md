@@ -15,7 +15,7 @@ related:
 # 🧪 Suite de Tests
 
 ```bash
-npm test          # vitest run — 98 tests en 11 archivos
+npm test          # vitest run — 106 tests en 11 archivos
 npm run typecheck # tsc de main/preload/lib/tests y del renderer
 ```
 
@@ -47,6 +47,14 @@ Los tests de git crean repos reales en una carpeta temporal y los borran al term
 | prepara solo las líneas elegidas | `buildHunkPatch` + `git apply --cached` contra git real |
 | quita del índice solo las líneas elegidas | parche inverso sobre el índice |
 | descarta un hunk completo del árbol de trabajo | parche inverso sobre el árbol |
+| quita unas líneas de un archivo nuevo preparado: sigue preparado sin ellas | cabecera convertida a cambio de contenido; queda `AM` |
+| quitar todas las líneas de un archivo nuevo lo saca del índice | se conserva `new file mode`; queda `??` |
+| prepara y descarta unas líneas de un archivo sin seguir | diff `--no-index`: crear en el índice con esas líneas y quitarlas del disco |
+| en un borrado preparado, quitar unas líneas las devuelve al índice | se conserva `deleted file mode` al revés |
+| en un borrado sin preparar, prepara o descarta unas líneas | conversión al preparar; recrear al descartar |
+| en un renombrado, quitar líneas mantiene el renombre preparado | sin `rename from/to` en el parche parcial |
+| varios bloques en un solo parche | `buildPatch` con un bloque entero y otro parcial; vacío si no hay cambios |
+| preparar unas líneas no se lleva el cambio de permisos | sin `old mode` / `new mode` |
 | parseStatus separa preparados, sin preparar, nuevos y conflictos | `parseStatus` |
 | parseNameStatus entiende renombrados | `parseNameStatus` |
 
