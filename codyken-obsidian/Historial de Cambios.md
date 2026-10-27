@@ -16,7 +16,8 @@ up: "[[00 - Inicio]]"
 - Las columnas del gráfico se pueden redimensionar arrastrando su borde (doble clic restablece el ancho); los anchos se guardan en la configuración.
 
 ### Cambios y arreglos
-- El diff (Bloques, Archivo y Dividido) cortaba las líneas largas: ahora se desplaza en horizontal y la cabecera de cada bloque, con sus botones, queda fija a la izquierda. Con *Ajustar líneas* se comporta como antes.
+- El diff (Bloques y Archivo) cortaba las líneas largas: ahora se desplaza en horizontal y la cabecera de cada bloque, con sus botones, queda fija a la izquierda. Con *Ajustar líneas* se comporta como antes.
+- *Dividido* se ve como el *Split* de GitKraken: el archivo completo en dos paneles al 50 % que llenan la vista, bajan juntos y se desplazan en horizontal cada uno por su cuenta, con las filas alineadas. Antes el lado derecho quedaba fuera de la pantalla con líneas largas.
 - Las fechas y horas se muestran en hora de Colombia (`America/Bogota`) con formato de 12 horas (*a. m.* / *p. m.*).
 
 ## 2026-10-20 — App de macOS instalable

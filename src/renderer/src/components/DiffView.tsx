@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { DiffMode, DiffSource, EditTarget } from '../../../shared/types'
 import { api } from '../api'
 import { intraline, pairChangedLines, parseDiff, toSplitRows, type DiffLine, type Hunk } from '../lib/diff'
@@ -45,7 +45,8 @@ export function DiffView(props: DiffViewProps) {
   const [showAll, setShowAll] = useState(false)
   const anchor = useRef<{ hunk: number; line: number } | null>(null)
   const sourceKey = JSON.stringify(source)
-  const full = mode === 'file'
+  // Archivo y Dividido muestran el archivo entero, como GitKraken
+  const full = mode === 'file' || mode === 'split'
 
   useEffect(() => {
     let alive = true
@@ -198,9 +199,9 @@ export function DiffView(props: DiffViewProps) {
       const selectedHere = selection.get(hi) ?? null
       hunks.push(
         <div className="hunk" key={hi}>
-          {mode !== 'file' || hunkActions.length > 0 ? (
+          {!full || hunkActions.length > 0 ? (
             <div className="hunk-header">
-              <span className="mono hunk-range">{mode === 'file' ? 'Archivo completo' : hunk.header}</span>
+              <span className="mono hunk-range">{full ? 'Archivo completo' : hunk.header}</span>
               <span className="spacer" />
               {hunkActions.map((action) => (
                 <HunkButton key={action} action={action} count={selectedHere?.size ?? 0} onClick={() => void apply(hi, action)} />
@@ -213,7 +214,7 @@ export function DiffView(props: DiffViewProps) {
             </div>
           ) : null}
           {mode === 'split' ? (
-            <SplitHunk hunk={hunk} lang={lang} selected={selectedHere} selectable={selectable} onToggle={(line, shift) => toggleLine(hi, line, shift)} lineAction={lineActionFor(hi)} />
+            <SplitHunk hunk={hunk} lang={lang} wrap={wrap} selected={selectedHere} selectable={selectable} onToggle={(line, shift) => toggleLine(hi, line, shift)} lineAction={lineActionFor(hi)} />
           ) : (
             <UnifiedHunk hunk={hunk} lang={lang} selected={selectedHere} selectable={selectable} onToggle={(line, shift) => toggleLine(hi, line, shift)} lineAction={lineActionFor(hi)} />
           )}
@@ -308,7 +309,7 @@ export function DiffView(props: DiffViewProps) {
           <button className="btn btn-xs" onClick={() => setSelection(NONE)}>Deseleccionar</button>
         </div>
       )}
-      <div className={`diff-body ${wrap ? 'wrap' : ''}`}>{body}</div>
+      <div className={`diff-body ${wrap ? 'wrap' : ''} ${mode === 'split' ? 'split' : ''}`}>{body}</div>
     </div>
   )
 }
@@ -401,8 +402,30 @@ interface LinePicking {
   lineAction: LineAction | null
 }
 
-function SplitHunk({ hunk, lang, ...picking }: { hunk: Hunk; lang: string | null } & LinePicking) {
+function SplitHunk({ hunk, lang, wrap, ...picking }: { hunk: Hunk; lang: string | null; wrap: boolean } & LinePicking) {
   const rows = useMemo(() => toSplitRows(hunk), [hunk])
+  const left = useRef<HTMLDivElement>(null)
+  const right = useRef<HTMLDivElement>(null)
+  /** Los dos lados bajan juntos; en horizontal cada uno va por su cuenta */
+  const follow = (from: RefObject<HTMLDivElement | null>, to: RefObject<HTMLDivElement | null>) => () => {
+    if (from.current && to.current && to.current.scrollTop !== from.current.scrollTop) to.current.scrollTop = from.current.scrollTop
+  }
+  // Sin ajustar, cada lado ocupa la mitad y se desplaza en horizontal por su cuenta (las filas miden lo mismo y quedan alineadas)
+  if (!wrap)
+    return (
+      <div className="diff-split-cols">
+        <div className="split-side" ref={left} onScroll={follow(left, right)}>
+          <div className="split-side-lines">
+            {rows.map((row, i) => <SplitCell key={i} side={row.left} other={row.right} kind="del" lang={lang} {...picking} />)}
+          </div>
+        </div>
+        <div className="split-side" ref={right} onScroll={follow(right, left)}>
+          <div className="split-side-lines">
+            {rows.map((row, i) => <SplitCell key={i} side={row.right} other={row.left} kind="add" lang={lang} {...picking} />)}
+          </div>
+        </div>
+      </div>
+    )
   return (
     <div className="diff-split">
       {rows.map((row, i) => (
