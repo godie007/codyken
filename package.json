@@ -5,7 +5,8 @@
   "description": "Codyken: cliente Git de escritorio",
   "main": "out/main/index.js",
   "scripts": {
-    "predev": "bash scripts/dev-name.sh",
+    "postinstall": "node scripts/ensure-electron.cjs",
+    "predev": "node scripts/ensure-electron.cjs && node scripts/dev-name.cjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
