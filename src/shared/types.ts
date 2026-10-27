@@ -258,6 +258,8 @@ export interface Settings {
   activeTab: number
   pullMode: PullMode
   columns: ColumnId[]
+  /** Ancho en px de las columnas que el usuario redimensionó (el mensaje siempre ocupa el resto) */
+  columnWidths: Partial<Record<ColumnId, number>>
   leftWidth: number
   rightWidth: number
   leftVisible: boolean

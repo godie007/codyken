@@ -4,11 +4,20 @@ description: Cambios relevantes de Codyken por fecha
 type: referencia
 tags:
   - changelog
-updated: 2026-10-20
+updated: 2026-10-27
 up: "[[00 - Inicio]]"
 ---
 
 # 📝 Historial de Cambios
+
+## 2026-10-27 — Scroll horizontal en el diff y hora de Colombia
+
+### Nuevo
+- Las columnas del gráfico se pueden redimensionar arrastrando su borde (doble clic restablece el ancho); los anchos se guardan en la configuración.
+
+### Cambios y arreglos
+- El diff (Bloques, Archivo y Dividido) cortaba las líneas largas: ahora se desplaza en horizontal y la cabecera de cada bloque, con sus botones, queda fija a la izquierda. Con *Ajustar líneas* se comporta como antes.
+- Las fechas y horas se muestran en hora de Colombia (`America/Bogota`) con formato de 12 horas (*a. m.* / *p. m.*).
 
 ## 2026-10-20 — App de macOS instalable
 

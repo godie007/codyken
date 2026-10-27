@@ -153,7 +153,7 @@ function PromptDialog({ options, onClose }: { options: PromptOptions; onClose: (
 
 // ── Separador redimensionable ───────────────────────────────────────────────
 
-export function Resizer({ onResize, side }: { onResize: (delta: number) => void; side: 'left' | 'right' }) {
+export function Resizer({ onResize, side, onReset, className = 'resizer' }: { onResize: (delta: number) => void; side: 'left' | 'right'; onReset?: () => void; className?: string }) {
   const [dragging, setDragging] = useState(false)
   const last = useRef(0)
   useEffect(() => {
@@ -175,11 +175,12 @@ export function Resizer({ onResize, side }: { onResize: (delta: number) => void;
   }, [dragging, onResize, side])
   return (
     <div
-      className={`resizer ${dragging ? 'active' : ''}`}
+      className={`${className} ${dragging ? 'active' : ''}`}
       onMouseDown={(e) => {
         last.current = e.clientX
         setDragging(true)
       }}
+      onDoubleClick={onReset}
     />
   )
 }

@@ -1545,10 +1545,12 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
               onWipSummary={(summary) => setDraft({ ...draft, summary })}
               onClearFilter={() => setFilter(NO_FILTER)}
               columns={settings.columns}
+              columnWidths={settings.columnWidths}
               canLoadMore={commits.length >= data.limit}
               scrollTarget={scrollTarget}
               searchFocus={searchFocus}
               onColumnsChange={(columns) => onSettings({ columns })}
+              onColumnWidths={(columnWidths) => onSettings({ columnWidths })}
               onSelect={(hash, extend) => select(hash, false, extend)}
               onCommitMenu={(c) => void commitMenu(c)}
               onLabelMenu={labelMenu}

@@ -1,6 +1,8 @@
 const relative = new Intl.RelativeTimeFormat('es', { numeric: 'auto' })
-const shortDate = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric' })
-const fullDate = new Intl.DateTimeFormat('es', { dateStyle: 'full', timeStyle: 'short' })
+// Fechas y horas en hora de Colombia, con a. m. / p. m.
+const TIME_ZONE = 'America/Bogota'
+const shortDate = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', year: 'numeric', timeZone: TIME_ZONE })
+const fullDate = new Intl.DateTimeFormat('es-CO', { dateStyle: 'full', timeStyle: 'short', hour12: true, timeZone: TIME_ZONE })
 
 export function relativeTime(ms: number, now = Date.now()): string {
   const seconds = Math.round((ms - now) / 1000)

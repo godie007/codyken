@@ -6,7 +6,7 @@ import { laneColor, WIP_HASH, type GraphLayout, type GraphRow } from '../lib/gra
 import { REF_MIME } from '../lib/drop'
 import { labelFullName, type RefLabel } from '../lib/refs'
 import { Icon } from './Icons'
-import { Avatar } from './ui'
+import { Avatar, Resizer } from './ui'
 
 const ROW_H = 34
 const LANE_W = 24
@@ -22,6 +22,14 @@ const COLUMN_LABELS: Record<ColumnId, string> = {
   sha: 'SHA'
 }
 const COLUMN_ORDER: ColumnId[] = ['refs', 'graph', 'message', 'author', 'date', 'sha']
+/** Ancho por defecto y límites de las columnas redimensionables; el del gráfico depende de los carriles */
+const COLUMN_WIDTHS: Record<Exclude<ColumnId, 'message'>, { width: number; min: number; max: number }> = {
+  refs: { width: 184, min: 60, max: 640 },
+  graph: { width: 0, min: 36, max: 40 * LANE_W + 12 },
+  author: { width: 132, min: 60, max: 400 },
+  date: { width: 118, min: 60, max: 300 },
+  sha: { width: 74, min: 50, max: 240 }
+}
 
 export interface GraphViewProps {
   commits: Commit[]
@@ -35,6 +43,7 @@ export interface GraphViewProps {
   compareBase?: string | null
   highlight: string | null
   columns: ColumnId[]
+  columnWidths: Partial<Record<ColumnId, number>>
   canLoadMore: boolean
   scrollTarget: { hash: string; nonce: number } | null
   searchFocus: number
@@ -42,6 +51,7 @@ export interface GraphViewProps {
   filterActive: boolean
   onWipSummary: (summary: string) => void
   onColumnsChange: (columns: ColumnId[]) => void
+  onColumnWidths: (widths: Partial<Record<ColumnId, number>>) => void
   /** extend: ⌘/Ctrl+clic, para comparar con lo que ya estaba seleccionado */
   onSelect: (hash: string, extend?: boolean) => void
   onCommitMenu: (commit: Commit) => void
@@ -64,11 +74,20 @@ export function GraphView(props: GraphViewProps) {
   const offset = hasWip ? 1 : 0
   const total = commits.length + offset
 
-  const graphWidth = Math.min(graph.maxLanes, MAX_VISIBLE_LANES) * LANE_W + 12
+  const widthOf = (c: Exclude<ColumnId, 'message'>): number =>
+    props.columnWidths[c] ?? (c === 'graph' ? Math.min(graph.maxLanes, MAX_VISIBLE_LANES) * LANE_W + 12 : COLUMN_WIDTHS[c].width)
+  const graphWidth = widthOf('graph')
   const visible = COLUMN_ORDER.filter((c) => c === 'message' || columns.includes(c))
-  const template = visible
-    .map((c) => ({ refs: '184px', graph: `${graphWidth}px`, message: 'minmax(140px, 1fr)', author: '132px', date: '118px', sha: '74px' })[c])
-    .join(' ')
+  const template = visible.map((c) => (c === 'message' ? 'minmax(140px, 1fr)' : `${widthOf(c)}px`)).join(' ')
+
+  const resizeColumn = (c: Exclude<ColumnId, 'message'>, delta: number): void => {
+    const { min, max } = COLUMN_WIDTHS[c]
+    props.onColumnWidths({ ...props.columnWidths, [c]: Math.round(Math.min(max, Math.max(min, widthOf(c) + delta))) })
+  }
+  const resetColumn = (c: ColumnId): void => {
+    const { [c]: _, ...rest } = props.columnWidths
+    props.onColumnWidths(rest)
+  }
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -194,8 +213,17 @@ export function GraphView(props: GraphViewProps) {
       </div>
       <div className="graph-header" style={{ gridTemplateColumns: template }} onContextMenu={(e) => (e.preventDefault(), void headerMenu())}>
         {visible.map((c) => (
-          <div key={c} className={`graph-header-cell col-${c}`}>
+          <div key={c} className={`graph-header-cell col-${c}`} title={c === 'message' ? undefined : `${COLUMN_LABELS[c]} · arrastra el borde para cambiar el ancho, doble clic para restablecerlo`}>
             {COLUMN_LABELS[c]}
+            {c !== 'message' && (
+              // Las columnas a la derecha del mensaje crecen hacia la izquierda: su borde útil es el izquierdo
+              <Resizer
+                className={`col-resizer ${c === 'refs' || c === 'graph' ? 'col-resizer-end' : 'col-resizer-start'}`}
+                side={c === 'refs' || c === 'graph' ? 'left' : 'right'}
+                onResize={(d) => resizeColumn(c, d)}
+                onReset={() => resetColumn(c)}
+              />
+            )}
           </div>
         ))}
         <button className="icon-btn graph-header-gear" title="Elegir columnas" onClick={() => void headerMenu()}>

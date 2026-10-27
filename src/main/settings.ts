@@ -10,6 +10,7 @@ const DEFAULTS: Settings = {
   activeTab: 0,
   pullMode: 'merge',
   columns: ['refs', 'graph', 'message', 'author', 'date'],
+  columnWidths: {},
   leftWidth: 250,
   rightWidth: 380,
   leftVisible: true,

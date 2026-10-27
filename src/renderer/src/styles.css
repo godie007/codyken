@@ -796,9 +796,48 @@ pre {
   padding-right: 34px;
 }
 .graph-header-cell {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
   padding: 0 10px;
   overflow: hidden;
   white-space: nowrap;
+}
+.col-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 2;
+}
+.col-resizer-end {
+  right: 0;
+}
+.col-resizer-start {
+  left: 0;
+}
+.col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--border);
+}
+.col-resizer-end::after {
+  right: 0;
+}
+.col-resizer-start::after {
+  left: 0;
+}
+.col-resizer:hover::after,
+.col-resizer.active::after {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
 }
 .graph-header-gear {
   position: absolute;
@@ -959,7 +998,7 @@ pre {
   align-items: center;
   gap: 4px;
   min-width: 0;
-  max-width: 168px;
+  max-width: 100%;
   height: 21px;
   padding: 0 7px 0 6px;
   border-radius: 4px;
@@ -1037,8 +1076,11 @@ pre {
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow);
 }
+.pills-pop {
+  width: max-content;
+}
 .pills-pop .pill {
-  max-width: 280px;
+  max-width: 480px;
 }
 .pills:hover .pills-pop {
   display: flex;
@@ -1310,11 +1352,18 @@ pre {
   flex: 1;
   overflow: auto;
   padding: 12px;
+  container-type: inline-size;
+}
+/* Sin ajustar líneas, cada bloque mide lo que su línea más larga y el cuerpo se desplaza en horizontal */
+.diff-body:not(.wrap) .hunk {
+  width: max-content;
+  min-width: 100%;
 }
 .hunk {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  /* clip y no hidden: hidden haría del bloque el contenedor de scroll y la cabecera dejaría de pegarse */
+  overflow: clip;
   margin-bottom: 12px;
   background: var(--bg-graph);
 }
@@ -1326,6 +1375,11 @@ pre {
   background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
   min-height: 32px;
+  /* Los botones del bloque siguen a la vista al desplazarse en horizontal */
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  max-width: 100cqw;
 }
 .hunk-range {
   color: var(--text-muted);
@@ -1351,6 +1405,9 @@ pre {
 .diff-split .diff-line {
   min-width: 0;
 }
+.diff-body:not(.wrap) .diff-split {
+  grid-template-columns: minmax(max-content, 1fr) minmax(max-content, 1fr);
+}
 .wrap .diff-line {
   min-width: 0;
 }
@@ -1373,7 +1430,7 @@ pre {
   white-space: pre;
   padding-right: 16px;
 }
-.diff-split .code {
+.wrap .diff-split .code {
   overflow: hidden;
 }
 .wrap .diff-line .code {
@@ -2112,7 +2169,7 @@ mark.hl-del {
   color: var(--mk-fg);
 }
 .graph-header .col-graph {
-  height: auto;
+  height: 100%;
   padding: 0 4px;
   text-overflow: clip;
 }
