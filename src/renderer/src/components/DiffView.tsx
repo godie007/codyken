@@ -2,13 +2,31 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type Re
 import type { DiffMode, DiffSource, EditTarget } from '../../../shared/types'
 import { api } from '../api'
 import { intraline, pairChangedLines, parseDiff, toSplitRows, type DiffLine, type Hunk } from '../lib/diff'
-import { shortHash } from '../lib/format'
+import { shortHash, splitPath } from '../lib/format'
 import { highlightCode, languageFor } from '../lib/highlight'
 import { buildPatch, supportsPartialStaging, type HunkPick } from '../lib/patch'
 import { Icon } from './Icons'
 import { StatusBadge, useToast } from './ui'
 
 const LINE_LIMIT = 6000
+const HINT_KEY = 'codyken.diffHintHidden'
+
+/** Preferencias de este equipo que no hace falta sincronizar: si el almacenamiento falla, se muestran como la primera vez */
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeFlag(key: string): void {
+  try {
+    localStorage.setItem(key, '1')
+  } catch {
+    // sin almacenamiento: el consejo vuelve a salir la próxima vez
+  }
+}
 
 export interface DiffViewProps {
   repo: string
@@ -44,6 +62,11 @@ export function DiffView(props: DiffViewProps) {
   const [selection, setSelection] = useState<LineSelection>(NONE)
   const [showAll, setShowAll] = useState(false)
   const anchor = useRef<{ hunk: number; line: number } | null>(null)
+  const [hintHidden, setHintHidden] = useState(() => readFlag(HINT_KEY))
+  const hideHint = (): void => {
+    setHintHidden(true)
+    writeFlag(HINT_KEY)
+  }
   const sourceKey = JSON.stringify(source)
   // Archivo y Dividido muestran el archivo entero, como GitKraken
   const full = mode === 'file' || mode === 'split'
@@ -238,8 +261,12 @@ export function DiffView(props: DiffViewProps) {
     <div className="diff-view">
       <div className="diff-toolbar">
         <StatusBadge status={status} />
-        <span className="diff-path truncate" title={source.path}>{source.path}</span>
-        <span className="diff-source">{label}</span>
+        <span className="diff-path" title={source.path}>
+          {/* Como en la lista de archivos: el nombre siempre se ve y la carpeta, detrás, se recorta */}
+          <span className="diff-path-name">{splitPath(source.path).name}</span>
+          {splitPath(source.path).dir && <span className="diff-path-dir">/{splitPath(source.path).dir.slice(0, -1)}</span>}
+        </span>
+        <span className="diff-source truncate" title={label}>{label}</span>
         <span className="spacer" />
         {source.kind === 'conflict' ? (
           <>
@@ -251,14 +278,14 @@ export function DiffView(props: DiffViewProps) {
           <>
             {source.kind === 'unstaged' && (
               <>
-                <button className="btn btn-sm danger" onClick={props.onDiscardFile}>Descartar archivo</button>
-                <button className="btn btn-sm btn-stage" onClick={props.onStageFile}>Preparar archivo</button>
+                <button className="btn btn-sm danger" onClick={props.onDiscardFile} title="Descartar todos los cambios del archivo">Descartar</button>
+                <button className="btn btn-sm btn-stage" onClick={props.onStageFile} title="Preparar el archivo entero">Preparar</button>
               </>
             )}
-            {source.kind === 'staged' && <button className="btn btn-sm" onClick={props.onUnstageFile}>Quitar archivo</button>}
+            {source.kind === 'staged' && <button className="btn btn-sm" onClick={props.onUnstageFile} title="Quitar el archivo entero de lo preparado">Quitar</button>}
             {editable && (
               <button className="btn btn-sm" onClick={() => props.onEdit!(source.kind === 'staged' ? 'index' : 'working')} title={source.kind === 'staged' ? 'Edita la versión preparada: lo que entrará en el commit' : 'Edita el archivo'}>
-                <Icon.Edit size={13} /> Editar
+                <Icon.Edit size={13} /> <span className="btn-label">Editar</span>
               </button>
             )}
             <div className="segmented">
@@ -283,11 +310,16 @@ export function DiffView(props: DiffViewProps) {
           <Icon.Close size={15} />
         </button>
       </div>
-      {selectable && file && file.hunks.length > 0 && selectedCount === 0 && (
+      {selectable && file && file.hunks.length > 0 && selectedCount === 0 && !hintHidden && (
         <div className="diff-hint">
-          {source.kind === 'unstaged'
-            ? 'Consejo: pulsa + junto al número de una línea para prepararla, o haz clic en varias (Mayús para un rango, en uno o varios bloques) y prepáralas juntas o retócalas con «Editar y preparar».'
-            : 'Consejo: pulsa − junto al número de una línea para quitarla de lo preparado (vuelve a Sin preparar), o haz clic en varias (Mayús para un rango) y quítalas juntas.'}
+          <span className="truncate">
+            {source.kind === 'unstaged'
+              ? 'Pulsa + junto a una línea para prepararla, o haz clic en varias (Mayús: rango) y prepáralas juntas.'
+              : 'Pulsa − junto a una línea para quitarla de lo preparado, o haz clic en varias (Mayús: rango) y quítalas juntas.'}
+          </span>
+          <button className="icon-btn" title="No volver a mostrar" aria-label="Ocultar consejo" onClick={hideHint}>
+            <Icon.Close size={12} />
+          </button>
         </div>
       )}
       {selectable && selectedCount > 0 && (

@@ -19,6 +19,13 @@ up: "[[00 - Inicio]]"
 - El diff (Bloques y Archivo) cortaba las líneas largas: ahora se desplaza en horizontal y la cabecera de cada bloque, con sus botones, queda fija a la izquierda. Con *Ajustar líneas* se comporta como antes.
 - *Dividido* se ve como el *Split* de GitKraken: el archivo completo en dos paneles al 50 % que llenan la vista, bajan juntos y se desplazan en horizontal cada uno por su cuenta, con las filas alineadas. Antes el lado derecho quedaba fuera de la pantalla con líneas largas.
 - Las fechas y horas se muestran en hora de Colombia (`America/Bogota`) con formato de 12 horas (*a. m.* / *p. m.*).
+- Revisión visual con capturas de todas las vistas:
+  - La barra del diff ocupa siempre una fila: *Descartar* / *Preparar* / *Quitar* sin la palabra «archivo», *Editar* queda solo con el icono si el panel es angosto y la etiqueta de origen se recorta antes que los botones.
+  - La ruta del diff muestra primero el nombre del archivo y después la carpeta en gris (como la lista de archivos); el nombre nunca se recorta.
+  - El consejo de selección de líneas cabe en una línea y se puede cerrar para siempre.
+  - La cabecera de cada bloque (`@@ … @@`) no se parte en dos líneas.
+  - Las rutas largas (repositorios recientes y barra de estado) se recortan por el principio, para que se vea la carpeta del repo.
+  - La barra de estado dice *1 commit* en singular.
 
 ## 2026-10-20 — App de macOS instalable
 

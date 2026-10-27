@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, mod } from '../api'
-import { homeRelative, repoName } from '../lib/format'
+import { homeRelative, ltr, repoName } from '../lib/format'
 import { matchRepos } from '../lib/repos'
 import { Icon } from './Icons'
 import { useToast } from './ui'
@@ -157,7 +157,7 @@ export function RepoList(props: RepoListProps) {
               <span className="repo-row-icon">{gone ? <Icon.Warning size={15} /> : <Icon.Folder size={15} />}</span>
               <span className="repo-row-text">
                 <span className="repo-row-name truncate">{repoName(path)}</span>
-                <span className="repo-row-path truncate">{homeRelative(path)}</span>
+                <span className="repo-row-path truncate-start">{ltr(homeRelative(path))}</span>
               </span>
               {gone ? (
                 <span className="repo-tag warn">no encontrado</span>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Commit, DiffSource, EditTarget, FetchResult, FileChange, GraphFilter, MenuItemSpec, PullMode, PullRequest, PullRequestInfo, RebaseMode, RebaseStep, Ref, RepoState, ResetMode, Settings, StashEntry, Worktree } from '../../../shared/types'
 import { api, mod } from '../api'
-import { homeRelative, relativeTime, repoName, shortHash } from '../lib/format'
+import { homeRelative, ltr, relativeTime, repoName, shortHash } from '../lib/format'
 import { computeGraph, WIP_HASH, withStashes } from '../lib/graph'
 import { planDrop, dropTargetRef, type DropAction, type DropTarget } from '../lib/drop'
 import { labelsByCommit, type RefLabel } from '../lib/refs'
@@ -1587,7 +1587,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
         )}
       </div>
       <footer className="status-bar">
-        <span className="sb-item"><Icon.Folder size={12} /> {homeRelative(repo)}</span>
+        <span className="sb-item sb-path" title={repo}><Icon.Folder size={12} /> <span className="truncate-start">{ltr(homeRelative(repo))}</span></span>
         {state?.branch && (
           <span className="sb-item">
             <Icon.Branch size={12} /> {state.branch}
@@ -1605,7 +1605,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
         )}
         <span className="spacer" />
         {lastFetch && <span className="sb-item muted">Último fetch {relativeTime(lastFetch)}</span>}
-        <span className="sb-item muted">{commits.length.toLocaleString('es')} commits</span>
+        <span className="sb-item muted">{commits.length.toLocaleString('es')} {commits.length === 1 ? 'commit' : 'commits'}</span>
       </footer>
       {palette && <CommandPalette items={paletteItems()} onClose={() => setPalette(false)} />}
       {rebasePlan && (

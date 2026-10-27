@@ -39,6 +39,11 @@ export function repoName(path: string): string {
   return path.split('/').filter(Boolean).pop() ?? path
 }
 
+/** Para `.truncate-start`: marca el texto como izquierda a derecha, así la «/» inicial no salta al final */
+export function ltr(text: string): string {
+  return `\u200E${text}\u200E`
+}
+
 export function shortHash(hash: string): string {
   return hash.slice(0, 7)
 }
