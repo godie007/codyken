@@ -26,6 +26,8 @@ up: "[[00 - Inicio]]"
   - La cabecera de cada bloque (`@@ … @@`) no se parte en dos líneas.
   - Las rutas largas (repositorios recientes y barra de estado) se recortan por el principio, para que se vea la carpeta del repo.
   - La barra de estado dice *1 commit* en singular.
+  - Paneles del diff angostos (ventanas de 1000–1200 px con los dos paneles laterales): la barra pasa a filas ordenadas —archivo y cerrar arriba; acciones y controles de vista, cada grupo entero, debajo— y la cabecera de bloque pone sus botones bajo el rango. Verificado en 1000, 1200, 1440 y 1920 px y en los tres modos: ningún control queda fuera.
+- Modo captura: `CODYKEN_SNAPSHOT_SIZE` cambia el tamaño de la ventana ([[06 - QA y Tests/Modo Captura]]).
 
 ## 2026-10-20 — App de macOS instalable
 

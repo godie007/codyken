@@ -268,45 +268,50 @@ export function DiffView(props: DiffViewProps) {
         </span>
         <span className="diff-source truncate" title={label}>{label}</span>
         <span className="spacer" />
+        {/* Grupos que, en un panel angosto, bajan juntos a su propia fila */}
         {source.kind === 'conflict' ? (
-          <>
+          <div className="diff-tool-group">
             <button className="btn btn-sm" onClick={() => props.onResolveConflict('ours')} title="git checkout --ours">Usar versión HEAD</button>
             <button className="btn btn-sm" onClick={() => props.onResolveConflict('theirs')} title="git checkout --theirs">Usar versión entrante</button>
             <button className="btn btn-sm btn-primary" onClick={props.onStageFile}>Marcar resuelto</button>
-          </>
+          </div>
         ) : (
           <>
-            {source.kind === 'unstaged' && (
-              <>
-                <button className="btn btn-sm danger" onClick={props.onDiscardFile} title="Descartar todos los cambios del archivo">Descartar</button>
-                <button className="btn btn-sm btn-stage" onClick={props.onStageFile} title="Preparar el archivo entero">Preparar</button>
-              </>
-            )}
-            {source.kind === 'staged' && <button className="btn btn-sm" onClick={props.onUnstageFile} title="Quitar el archivo entero de lo preparado">Quitar</button>}
-            {editable && (
-              <button className="btn btn-sm" onClick={() => props.onEdit!(source.kind === 'staged' ? 'index' : 'working')} title={source.kind === 'staged' ? 'Edita la versión preparada: lo que entrará en el commit' : 'Edita el archivo'}>
-                <Icon.Edit size={13} /> <span className="btn-label">Editar</span>
-              </button>
-            )}
-            <div className="segmented">
-              {(['hunk', 'file', 'split'] as DiffMode[]).map((m) => (
-                <button key={m} className={mode === m ? 'active' : ''} onClick={() => props.onModeChange(m)}>
-                  {{ hunk: 'Bloques', file: 'Archivo', split: 'Dividido' }[m]}
+            <div className="diff-tool-group">
+              {source.kind === 'unstaged' && (
+                <>
+                  <button className="btn btn-sm danger" onClick={props.onDiscardFile} title="Descartar todos los cambios del archivo">Descartar</button>
+                  <button className="btn btn-sm btn-stage" onClick={props.onStageFile} title="Preparar el archivo entero">Preparar</button>
+                </>
+              )}
+              {source.kind === 'staged' && <button className="btn btn-sm" onClick={props.onUnstageFile} title="Quitar el archivo entero de lo preparado">Quitar</button>}
+              {editable && (
+                <button className="btn btn-sm" onClick={() => props.onEdit!(source.kind === 'staged' ? 'index' : 'working')} title={source.kind === 'staged' ? 'Edita la versión preparada: lo que entrará en el commit' : 'Edita el archivo'}>
+                  <Icon.Edit size={13} /> <span className="btn-label">Editar</span>
                 </button>
-              ))}
+              )}
             </div>
-            <button className={`icon-btn ${wrap ? 'active' : ''}`} title="Ajustar líneas largas" onClick={() => props.onWrapChange(!wrap)}>
-              <Icon.Wrap size={15} />
-            </button>
-            {!props.embedded && (
-              <>
-                <button className="icon-btn" title="Historial: commits que cambiaron este archivo" onClick={props.onHistory}><Icon.History size={15} /></button>
-                <button className="icon-btn" title="Blame: quién cambió cada línea" onClick={props.onBlame}><Icon.Blame size={15} /></button>
-              </>
-            )}
+            <div className="diff-tool-group">
+              <div className="segmented">
+                {(['hunk', 'file', 'split'] as DiffMode[]).map((m) => (
+                  <button key={m} className={mode === m ? 'active' : ''} onClick={() => props.onModeChange(m)}>
+                    {{ hunk: 'Bloques', file: 'Archivo', split: 'Dividido' }[m]}
+                  </button>
+                ))}
+              </div>
+              <button className={`icon-btn ${wrap ? 'active' : ''}`} title="Ajustar líneas largas" onClick={() => props.onWrapChange(!wrap)}>
+                <Icon.Wrap size={15} />
+              </button>
+              {!props.embedded && (
+                <>
+                  <button className="icon-btn" title="Historial: commits que cambiaron este archivo" onClick={props.onHistory}><Icon.History size={15} /></button>
+                  <button className="icon-btn" title="Blame: quién cambió cada línea" onClick={props.onBlame}><Icon.Blame size={15} /></button>
+                </>
+              )}
+            </div>
           </>
         )}
-        <button className="icon-btn" title="Cerrar (Esc)" onClick={props.onClose}>
+        <button className="icon-btn diff-close" title="Cerrar (Esc)" onClick={props.onClose}>
           <Icon.Close size={15} />
         </button>
       </div>

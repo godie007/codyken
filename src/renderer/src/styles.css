@@ -1328,6 +1328,42 @@ pre {
     display: none;
   }
 }
+/* Panel muy angosto (ventana chica con los dos paneles laterales): mejor dos filas ordenadas que botones cortados */
+@container diff-view (max-width: 700px) {
+  .diff-view .diff-toolbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .diff-view .diff-toolbar > .diff-path {
+    flex: 1 1 auto;
+  }
+  .diff-view .diff-toolbar > .spacer {
+    display: none;
+  }
+  /* Fila 1: archivo y cerrar; después, acciones y controles de vista, cada grupo entero */
+  .diff-view .diff-toolbar > .diff-close {
+    order: 1;
+  }
+  .diff-view .diff-toolbar > .diff-tool-group {
+    order: 2;
+  }
+  /* Salto de línea después de cerrar */
+  .diff-view .diff-toolbar::after {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+    margin-top: -6px;
+  }
+  .diff-view .hunk-header {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .diff-view .hunk-header > .hunk-range {
+    flex-basis: 100%;
+  }
+}
 .diff-toolbar {
   display: flex;
   align-items: center;
@@ -1345,6 +1381,14 @@ pre {
 }
 .diff-toolbar > .spacer {
   flex: 1;
+}
+.diff-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.diff-tool-group:empty {
+  display: none;
 }
 .diff-toolbar > .diff-source {
   flex: 0 1 auto;

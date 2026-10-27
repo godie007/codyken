@@ -24,6 +24,7 @@ CODYKEN_SNAPSHOT=/ruta/foto.png CODYKEN_OPEN=/ruta/repo npx electron .
 |---|---|---|
 | `CODYKEN_SNAPSHOT` | — | Ruta del PNG; activa el modo |
 | `CODYKEN_OPEN` | — | Repo que se abre en una única pestaña |
+| `CODYKEN_SNAPSHOT_SIZE` | 1440x900 | Tamaño de la ventana (`ANCHOxALTO`, mínimo 1000x640) para probar paneles angostos |
 | `CODYKEN_SNAPSHOT_DELAY` | 2500 ms | Espera tras cargar la página |
 | `CODYKEN_SNAPSHOT_JS` | — | Script que se ejecuta en la ventana antes de la foto |
 | `CODYKEN_SNAPSHOT_SETTLE` | 1200 ms | Espera tras el script |

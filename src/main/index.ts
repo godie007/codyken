@@ -235,10 +235,15 @@ function setAppMenu(): void {
 /** Icono de la app (lo genera scripts/icon.cjs a partir del logo) */
 const appIcon = (): Electron.NativeImage => nativeImage.createFromPath(join(app.getAppPath(), 'resources/icon.png'))
 
+/** En modo captura, `CODYKEN_SNAPSHOT_SIZE=1100x720` cambia el tamaño de la ventana */
+const snapshotSize = (): { width: number; height: number } => {
+  const match = snapshotPath ? /^(\d+)x(\d+)$/.exec(process.env.CODYKEN_SNAPSHOT_SIZE ?? '') : null
+  return match ? { width: Number(match[1]), height: Number(match[2]) } : { width: 1440, height: 900 }
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    ...snapshotSize(),
     minWidth: 1000,
     minHeight: 640,
     show: false,
