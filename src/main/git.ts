@@ -37,14 +37,28 @@ import type {
 
 export class GitError extends Error {}
 
-function buildEnv(): NodeJS.ProcessEnv {
+/** Variable de PATH del entorno: en Windows llega como `Path`, así que se busca sin distinguir mayúsculas. */
+const PATH_KEY = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH'
+const PATH_SEP = process.platform === 'win32' ? ';' : ':'
+// En Windows el instalador de Git no siempre agrega su carpeta al PATH de los procesos ya abiertos.
+const PATH_EXTRA =
+  process.platform === 'win32'
+    ? [
+        join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git', 'cmd'),
+        join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Git', 'cmd'),
+        ...(process.env.LOCALAPPDATA ? [join(process.env.LOCALAPPDATA, 'Programs', 'Git', 'cmd')] : []),
+        ...(process.env.USERPROFILE ? [join(process.env.USERPROFILE, 'scoop', 'shims')] : [])
+      ]
+    : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']
+
+export function buildEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env }
   // Las apps abiertas desde Finder heredan un PATH mínimo
-  const parts = (env.PATH ?? '').split(':').filter(Boolean)
-  for (const extra of ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']) {
-    if (!parts.includes(extra)) parts.push(extra)
+  const parts = (env[PATH_KEY] ?? '').split(PATH_SEP).filter(Boolean)
+  for (const extra of PATH_EXTRA) {
+    if (!parts.includes(extra) && existsSync(extra)) parts.push(extra)
   }
-  env.PATH = parts.join(':')
+  env[PATH_KEY] = parts.join(PATH_SEP)
   // Sin terminal no hay a quién pedirle credenciales: mejor fallar que quedar colgado
   env.GIT_TERMINAL_PROMPT = '0'
   env.GIT_OPTIONAL_LOCKS = '0'
@@ -65,6 +79,12 @@ interface RunOptions {
   env?: NodeJS.ProcessEnv
 }
 
+/** Mensaje cuando el binario de git no está en el PATH, según la plataforma. */
+const GIT_MISSING =
+  process.platform === 'win32'
+    ? 'No se encontró git. Instálalo desde git-scm.com/download/win y vuelve a abrir Codyken.'
+    : 'No se encontró git. Instala las herramientas de línea de comandos de Xcode.'
+
 export async function git(cwd: string, args: string[], options: RunOptions = {}): Promise<string> {
   return (await gitBuffer(cwd, args, options)).toString('utf8')
 }
@@ -78,7 +98,7 @@ export function gitBuffer(cwd: string, args: string[], options: RunOptions = {})
     child.stdout.on('data', (chunk: Buffer) => out.push(chunk))
     child.stderr.on('data', (chunk: Buffer) => err.push(chunk))
     child.on('error', (error: NodeJS.ErrnoException) => {
-      reject(new GitError(error.code === 'ENOENT' ? 'No se encontró git. Instala las herramientas de línea de comandos de Xcode.' : error.message))
+      reject(new GitError(error.code === 'ENOENT' ? GIT_MISSING : error.message))
     })
     child.on('close', (code) => {
       const stdout = Buffer.concat(out)
