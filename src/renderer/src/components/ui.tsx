@@ -1,6 +1,33 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { hashColor, initials } from '../lib/format'
+import { hashColor, initials, ltr, splitMiddle, splitPath } from '../lib/format'
 import { Icon } from './Icons'
+
+// ── Nombres de archivo ──────────────────────────────────────────────────────
+
+/** Nombre recortado por el medio: el principio y la extensión son lo que distingue a un archivo de otro */
+export function FileName({ name, className = '' }: { name: string; className?: string }) {
+  const { head, tail } = splitMiddle(name)
+  return (
+    <span className={`file-name-text ${className}`}>
+      <span className="file-name-head">{head}</span>
+      {tail && <span className="file-name-tail">{tail}</span>}
+    </span>
+  )
+}
+
+/** Ruta para las barras de herramientas: el nombre siempre se ve y la carpeta, detrás, solo si cabe */
+export function FilePath({ path, prefix }: { path: string; prefix?: string }) {
+  const { dir, name } = splitPath(path)
+  return (
+    <span className="diff-path" title={path}>
+      <span className="diff-path-main">
+        {prefix && <span className="diff-path-prefix">{prefix}</span>}
+        <FileName name={name} className="diff-path-name" />
+      </span>
+      {dir && <span className="diff-path-dir truncate-start">{ltr(dir.slice(0, -1))}</span>}
+    </span>
+  )
+}
 
 // ── Avisos ──────────────────────────────────────────────────────────────────
 

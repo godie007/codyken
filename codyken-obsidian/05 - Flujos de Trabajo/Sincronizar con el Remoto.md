@@ -36,7 +36,7 @@ El aviso resume qué ramas se adelantaron, cuáles divergen y cuáles se saltaro
 Después:
 
 - los globos de Pull/Push y los `↑n` / `↓n` del panel izquierdo se actualizan;
-- las ramas remotas nuevas aparecen en **Remoto** y en el gráfico (punteadas si no las tienes en local);
+- las ramas remotas nuevas aparecen en **Remoto** y en el gráfico (solo con ☁ si no las tienes en local);
 - las borradas en el servidor desaparecen y la local que las seguía muestra `✕`.
 
 Además se hace un fetch silencioso a los 4 s de abrir el repo y cada 10 minutos (adelanta las ramas atrasadas salvo la actual).

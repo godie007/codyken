@@ -4,7 +4,7 @@ import { api, mod } from '../api'
 import { formatFullDate, initials, relativeTime, shortHash } from '../lib/format'
 import { laneColor, WIP_HASH, type GraphLayout, type GraphRow } from '../lib/graph'
 import { REF_MIME } from '../lib/drop'
-import { labelFullName, type RefLabel } from '../lib/refs'
+import { labelFullName, labelText, labelTrack, type RefLabel } from '../lib/refs'
 import { Icon } from './Icons'
 import { Avatar, Resizer } from './ui'
 
@@ -400,21 +400,24 @@ function RefPill({ label, color, props }: { label: RefLabel; color: string; prop
   const isBranch = label.kind === 'branch'
   const remoteOnly = !label.local && label.remotes.length > 0
   const remoteNames = label.remotes.map((r) => r.remote).join(', ')
+  const { ahead, behind } = labelTrack(label)
+  const track = [ahead && `${ahead} sin subir`, behind && `${behind} por bajar`].filter(Boolean).join(', ')
   const title =
     label.kind === 'tag'
       ? `Etiqueta ${label.name}`
       : label.local && label.remotes.length
         ? `${label.name} — local y en ${remoteNames}`
-        : remoteOnly
-          ? `${label.name} — solo en el remoto`
-          : `${label.name} — solo local`
-  const slash = remoteOnly ? label.name.indexOf('/') : -1
+        : label.localTwin
+          ? `${label.remotes.map((r) => r.name).join(', ')} — tu rama local ${label.localTwin.name} está en otro commit`
+          : remoteOnly
+            ? `${label.remotes.map((r) => r.name).join(', ')} — solo en el remoto`
+            : `${label.name} — solo local`
   return (
     <span
       className={`pill pill-${label.kind} ${label.isHead ? 'pill-head' : ''} ${remoteOnly ? 'pill-remote' : ''} ${over ? 'pill-drop' : ''}`}
       style={{ ['--pill' as string]: color }}
       draggable={isBranch}
-      title={`${title}\nDoble clic: checkout${isBranch ? ' · Arrástrala sobre otra rama: merge, rebase, push o pull request' : ''}`}
+      title={`${title}${track ? `\nCommits: ${track}` : ''}\nDoble clic: checkout${isBranch ? ' · Arrástrala sobre otra rama: merge, rebase, push o pull request' : ''}`}
       onDragStart={(e) => {
         const ref = labelFullName(label)
         if (!ref) return e.preventDefault()
@@ -450,16 +453,9 @@ function RefPill({ label, color, props }: { label: RefLabel; color: string; prop
     >
       {label.isHead && <Icon.Check size={11} strokeWidth={3} />}
       {label.kind === 'tag' && <Icon.Tag size={11} />}
-      <span className="pill-name">
-        {slash > 0 ? (
-          <>
-            <span className="pill-remote-prefix">{label.name.slice(0, slash + 1)}</span>
-            {label.name.slice(slash + 1)}
-          </>
-        ) : (
-          label.name
-        )}
-      </span>
+      <span className="pill-name">{labelText(label)}</span>
+      {ahead > 0 && <span className="pill-track">↑{ahead}</span>}
+      {behind > 0 && <span className="pill-track">↓{behind}</span>}
       {label.local && <Icon.Laptop size={12} className="pill-icon" />}
       {label.remotes.length > 0 && <Icon.Cloud size={12} className="pill-icon" />}
     </span>

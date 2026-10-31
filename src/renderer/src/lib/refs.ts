@@ -8,11 +8,13 @@ export interface RefLabel {
   remotes: Ref[]
   tag?: Ref
   isHead: boolean
+  /** Rama local de esta remota cuando está en otro commit: va por delante o por detrás */
+  localTwin?: Ref
 }
 
 /**
- * Agrupa las referencias por commit. Si una rama local y su remota están en el mismo commit se muestran
- * como una sola etiqueta: la remota que sigue (upstream) o, si no sigue ninguna, la que se llama igual.
+ * Agrupa las referencias por commit. Una rama en el mismo commit en local y en sus remotos es una sola
+ * etiqueta: se le unen la remota que sigue (upstream) y las que se llaman igual, de cualquier remoto.
  */
 export function labelsByCommit(refs: Ref[], detachedHead: string | null): Map<string, RefLabel[]> {
   const map = new Map<string, RefLabel[]>()
@@ -32,15 +34,20 @@ export function labelsByCommit(refs: Ref[], detachedHead: string | null): Map<st
       list(ref.hash).push({ key: ref.fullName, kind: 'branch', name: ref.name, local: ref, remotes: [], isHead: !!ref.isHead })
     }
   }
+  const locals = refs.filter((r) => r.type === 'local')
   for (const ref of refs) {
     if (ref.type !== 'remote') continue
-    const short = ref.name.slice(ref.name.indexOf('/') + 1)
+    const short = shortName(ref)
     const labels = list(ref.hash)
     const twin =
       labels.find((l) => l.kind === 'branch' && l.local?.upstream === ref.name) ??
-      labels.find((l) => l.kind === 'branch' && l.local && !l.local.upstream && l.name === short)
+      labels.find((l) => l.kind === 'branch' && l.local?.name === short) ??
+      labels.find((l) => l.kind === 'branch' && !l.local && shortName(l.remotes[0]) === short)
     if (twin) twin.remotes.push(ref)
-    else labels.push({ key: ref.fullName, kind: 'branch', name: ref.name, remotes: [ref], isHead: false })
+    else {
+      const localTwin = locals.find((l) => l.upstream === ref.name) ?? locals.find((l) => !l.upstream && l.name === short)
+      labels.push({ key: ref.fullName, kind: 'branch', name: ref.name, remotes: [ref], isHead: false, localTwin })
+    }
   }
   for (const ref of refs) {
     if (ref.type === 'tag') list(ref.hash).push({ key: ref.fullName, kind: 'tag', name: ref.name, tag: ref, remotes: [], isHead: false })
@@ -51,6 +58,19 @@ export function labelsByCommit(refs: Ref[], detachedHead: string | null): Map<st
     labels.sort((a, b) => rank(a) - rank(b))
   }
   return map
+}
+
+const shortName = (ref: Ref): string => ref.name.slice(ref.name.indexOf('/') + 1)
+
+/** Texto de la etiqueta: el nombre de la rama; de qué remoto es lo dice su insignia */
+export function labelText(label: RefLabel): string {
+  return !label.local && label.remotes.length ? shortName(label.remotes[0]) : label.name
+}
+
+/** Commits de diferencia entre la rama local y la remota que sigue; la misma cifra en sus dos etiquetas */
+export function labelTrack(label: RefLabel): { ahead: number; behind: number } {
+  const local = label.local ?? label.localTwin
+  return { ahead: local?.ahead ?? 0, behind: local?.behind ?? 0 }
 }
 
 /** Referencia completa de una etiqueta de rama (la local si la hay); es lo que se arrastra. */

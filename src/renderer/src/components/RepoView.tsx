@@ -4,7 +4,9 @@ import { api, mod } from '../api'
 import { homeRelative, ltr, relativeTime, repoName, shortHash } from '../lib/format'
 import { computeGraph, WIP_HASH, withStashes } from '../lib/graph'
 import { planDrop, dropTargetRef, type DropAction, type DropTarget } from '../lib/drop'
-import { labelsByCommit, type RefLabel } from '../lib/refs'
+import { labelsByCommit, remoteBranchName, remoteTwin, type RefLabel } from '../lib/refs'
+import { planBulkDelete, type BulkDeletePlan } from '../lib/bulkdelete'
+import { BulkDeleteDialog } from './BulkDeleteDialog'
 import { useRepoData } from '../useRepoData'
 import { CommandPalette, type PaletteItem } from './CommandPalette'
 import { CommitPanel, type CommitDraft, type CommitPanelActions, type CompareEnd, type Selection } from './CommitPanel'
@@ -76,6 +78,8 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
   const [selection, setSelection] = useState<Selection>(null)
   const [diff, setDiff] = useState<DiffSource | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [bulkDelete, setBulkDelete] = useState<BulkDeletePlan | null>(null)
+  const [selectionReset, setSelectionReset] = useState(0)
   const busyRef = useRef<string | null>(null)
   const [palette, setPalette] = useState(false)
   const [repoMenu, setRepoMenu] = useState(false)
@@ -815,6 +819,78 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     }
   }
 
+  // ── Eliminar varias ramas ────────────────────────────────────────────────
+
+  const branchesMenu = async (list: Ref[], title?: string, onSelect?: () => void): Promise<void> => {
+    if (!list.length) return
+    const n = list.length
+    const id = await api.contextMenu([
+      { id: 'delete', label: `Eliminar ${n === 1 ? 'la rama' : `las ${n} ramas`}${title ? ` de ${title}` : ''}…` },
+      ...(onSelect ? [{ id: 'select', label: `Seleccionar ${n === 1 ? 'la rama' : `las ${n} ramas`}` }] : []),
+      { type: 'separator' },
+      { id: 'hide', label: 'Ocultar o mostrar en el gráfico' }
+    ])
+    if (id === 'delete') setBulkDelete(planBulkDelete(list, refs, data.worktrees))
+    else if (id === 'select') onSelect?.()
+    else if (id === 'hide') toggleHidden(list)
+  }
+
+  const runBulkDelete = async (plan: BulkDeletePlan, withTwins: boolean): Promise<void> => {
+    const deleted: Ref[] = []
+    const failed: string[] = []
+    const notMerged: Ref[] = []
+    const removeLocals = async (list: Ref[], force: boolean): Promise<void> => {
+      for (const ref of list) {
+        try {
+          await api.deleteBranch(repo, ref.name, force)
+          deleted.push(ref)
+        } catch (e) {
+          if (!force && /not fully merged/i.test(errorText(e))) notMerged.push(ref)
+          else failed.push(`${ref.name}: ${errorText(e)}`)
+        }
+      }
+    }
+    if (!(await run('Eliminar ramas locales', () => removeLocals(plan.locals, false)))) return
+    if (notMerged.length) {
+      const shown = notMerged.slice(0, 12).map((r) => r.name).join('\n')
+      const force = await confirm(
+        `${notMerged.length} ${notMerged.length === 1 ? 'rama tiene' : 'ramas tienen'} commits que no están en ninguna otra rama`,
+        'Eliminar de todos modos',
+        `${shown}${notMerged.length > 12 ? `\n… y ${notMerged.length - 12} más` : ''}\n\nSe recuperan con Deshacer mientras no cambies nada más. Si no aceptas, se conservan.`,
+        true
+      )
+      if (force) await run('Eliminar ramas locales', () => removeLocals(notMerged, true))
+    }
+    // La remota de una local se borra solo si la local se eliminó
+    const remotes = [...plan.remotes, ...(withTwins ? plan.twins.filter((t) => deleted.includes(t.local)).map((t) => t.remote) : [])]
+    const locals = deleted.length
+    let remoteCount = 0
+    if (remotes.length) {
+      await run('Eliminar ramas remotas', async () => {
+        for (const ref of remotes) {
+          try {
+            await api.deleteRemoteBranch(repo, ref.remote!, remoteBranchName(ref))
+            remoteCount++
+          } catch (e) {
+            failed.push(`${ref.name}: ${errorText(e)}`)
+          }
+        }
+      })
+    }
+    const total = locals + remoteCount
+    if (total) toast('success', `${total} ${total === 1 ? 'rama eliminada' : 'ramas eliminadas'}`, locals ? 'Las locales se recuperan con Deshacer.' : undefined)
+    if (failed.length) toast('error', `${failed.length} ${failed.length === 1 ? 'rama no se pudo eliminar' : 'ramas no se pudieron eliminar'}`, failed.join('\n'))
+    if (locals) {
+      const removed = deleted.slice()
+      await remember(
+        `Eliminar ${locals} ${locals === 1 ? 'rama' : 'ramas'}`,
+        async () => { for (const ref of removed) await api.createBranch(repo, ref.name, ref.hash, false) },
+        async () => { for (const ref of removed) await api.deleteBranch(repo, ref.name, true) }
+      )
+    }
+    void refreshAll()
+  }
+
   const renameBranch = async (ref: Ref): Promise<void> => {
     const result = await prompt({ title: 'Renombrar rama', initial: ref.name, confirmLabel: 'Renombrar', validate: (v) => (/\s/.test(v) ? 'El nombre no puede tener espacios' : null) })
     if (result && result.value !== ref.name && (await run('Renombrar rama', () => api.renameBranch(repo, ref.name, result.value), `Rama renombrada a ${result.value}`))) {
@@ -992,6 +1068,8 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
   const refMenu = async (ref: Ref): Promise<void> => {
     const isCurrent = !!ref.isHead
     const canIntegrate = !!currentBranch && !isCurrent && ref.type !== 'tag'
+    // Una rama sincronizada se ve una sola vez: desde ella también se llega a su remota
+    const remote = ref.type === 'remote' ? ref : ref.type === 'local' ? remoteTwin(ref, refs) : undefined
     const items: MenuItemSpec[] = [
       { id: 'checkout', label: ref.type === 'remote' ? 'Checkout (crea la rama local)' : ref.type === 'tag' ? 'Checkout (HEAD desacoplado)' : 'Checkout', enabled: !isCurrent },
       { type: 'separator' },
@@ -1011,7 +1089,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       ...(filterActive ? [{ id: 'show-all', label: 'Mostrar todas las ramas' }] : []),
       { type: 'separator' },
       ...(ref.type === 'local' ? [{ id: 'rename', label: 'Renombrar…' }, { id: 'delete', label: 'Eliminar…', enabled: !isCurrent }] : []),
-      ...(ref.type === 'remote' ? [{ id: 'delete-remote', label: 'Eliminar rama remota…' }] : []),
+      ...(remote ? [{ id: 'delete-remote', label: ref.type === 'remote' ? 'Eliminar rama remota…' : `Eliminar ${remote.name} del remoto…` }] : []),
       ...(ref.type === 'tag' ? [{ id: 'delete-tag', label: 'Eliminar etiqueta…' }] : []),
       { type: 'separator' },
       { id: 'copy', label: 'Copiar nombre' }
@@ -1032,11 +1110,11 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     else if (id === 'show-all') setFilter(NO_FILTER)
     else if (id === 'rename') void renameBranch(ref)
     else if (id === 'delete') void deleteLocalBranch(ref)
-    else if (id === 'delete-remote') {
-      const [remote, ...rest] = ref.name.split('/')
+    else if (id === 'delete-remote' && remote) {
+      const [remoteName, ...rest] = remote.name.split('/')
       const branch = rest.join('/')
-      if (await confirm(`¿Eliminar ${ref.name} del servidor?`, 'Eliminar', `Ejecuta git push ${remote} --delete ${branch}. Afecta a todas las personas que usan el remoto.`, true)) {
-        void run('Eliminar rama remota', () => api.deleteRemoteBranch(repo, remote, branch), `${ref.name} eliminada`)
+      if (await confirm(`¿Eliminar ${remote.name} del servidor?`, 'Eliminar', `Ejecuta git push ${remoteName} --delete ${branch}. Afecta a todas las personas que usan el remoto.`, true)) {
+        void run('Eliminar rama remota', () => api.deleteRemoteBranch(repo, remoteName, branch), `${remote.name} eliminada`)
       }
     } else if (id === 'delete-tag') {
       if (await confirm(`¿Eliminar la etiqueta ${ref.name}?`, 'Eliminar', 'Solo se elimina la etiqueta local.', true)) {
@@ -1427,9 +1505,12 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
                 submodules={data.submodules}
                 selectedStash={selectedStash}
                 filterFocus={filterFocus}
+                selectionReset={selectionReset}
                 onSelectRef={(ref) => select(ref.hash, true)}
                 onActivateRef={(ref) => void checkoutRef(ref)}
                 onRefMenu={(ref) => void refMenu(ref)}
+                onBranchesMenu={(list, title, onSelect) => void branchesMenu(list, title, onSelect)}
+                onDeleteBranches={(list) => setBulkDelete(planBulkDelete(list, refs, data.worktrees))}
                 onHoverRef={(ref) => setHighlight(ref?.hash ?? null)}
                 onToggleHidden={toggleHidden}
                 onClearFilter={() => setFilter(NO_FILTER)}
@@ -1608,6 +1689,18 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
         <span className="sb-item muted">{commits.length.toLocaleString('es')} {commits.length === 1 ? 'commit' : 'commits'}</span>
       </footer>
       {palette && <CommandPalette items={paletteItems()} onClose={() => setPalette(false)} />}
+      {bulkDelete && (
+        <BulkDeleteDialog
+          plan={bulkDelete}
+          onClose={(result) => {
+            const plan = bulkDelete
+            setBulkDelete(null)
+            if (!result) return
+            setSelectionReset((n) => n + 1)
+            void runBulkDelete(plan, result.withTwins)
+          }}
+        />
+      )}
       {rebasePlan && (
         <RebaseDialog
           repo={repo}

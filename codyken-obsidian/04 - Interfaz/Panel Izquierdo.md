@@ -23,7 +23,7 @@ Componente: `src/renderer/src/components/LeftPanel.tsx`. Arriba, un filtro de te
 | Sección | Contenido |
 |---|---|
 | 💻 **Local** | Ramas locales en carpetas por prefijo (`feature/`, `deploy/`…); la actual con ✓ en verde |
-| ☁ **Remoto** | Un grupo por remoto con su inicial, nombre y servidor (`github.com`, `local`…); dentro, sus ramas en carpetas. Las que están **igual que su local** no se repiten: se agrupan al final en *n iguales a su rama local* (plegado) |
+| ☁ **Remoto** | Un grupo por remoto con su nombre y servidor (`github.com`, `local`…); dentro, sus ramas en carpetas. Las que están **igual que su local** no se repiten ni se cuentan: aparecen solo en *Local* o al filtrar por su nombre |
 | 🔃 **Pull requests** / **Merge requests** | Solo si `origin` es de GitHub o GitLab: los abiertos, con ⟳ y **+** (crear) en la cabecera; ver [[#Pull requests]] |
 | 🏷 **Etiquetas** | Plegada por defecto; de la más nueva a la más vieja |
 | 📦 **Stashes** | Clic: lo selecciona y lleva el gráfico a su fila. Clic derecho: pop, aplicar, eliminar |

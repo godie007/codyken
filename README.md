@@ -39,7 +39,7 @@ Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales,
 ### Gráfico de commits
 
 - Cada commit muestra las **iniciales del autor**; los merges son un punto y HEAD lleva un anillo.
-- Las **etiquetas de rama** se unen a su commit con una línea del color del carril. Si la local y su remota están en el mismo commit son **una sola etiqueta** (💻 ☁); si difieren, dos; las que solo están en el remoto, punteadas.
+- Las **etiquetas de rama** se unen a su commit con una línea del color del carril. Una rama en el mismo commit en local y en sus remotos es **una sola etiqueta** (💻 ☁); si difieren, dos, con `↑n` / `↓n`; las que solo están en el remoto llevan ☁ y un relleno más suave.
 - Fila **`// WIP`** con el conteo de cambios, donde puedes escribir el resumen del commit.
 - Los **stashes** aparecen como un commit más (cuadrado punteado) **justo encima del commit donde se guardaron**, también si su rama ya no existe. Al seleccionarlo: *Aplicar*, *Aplicar y eliminar (pop)* o *Eliminar*; doble clic lo aplica.
 - Búsqueda por mensaje, autor o SHA (⌘F), columnas configurables, carga por páginas de 2000 commits y lista virtualizada.
@@ -127,7 +127,7 @@ Cada repo que abres, clonas o creas queda en una lista (hasta 50) para volver a 
 
 - El **ojo** junto a cada rama, carpeta o remoto la quita del gráfico; una rama local se oculta junto con su remota para que sus commits desaparezcan de verdad. También existe **Mostrar solo esta rama**.
 - En el panel izquierdo: ☁ si la rama está al día con su remota, `↑n` / `↓n` si difiere, `local` si nunca se subió y 💻 en las remotas que también tienes en local.
-- Una rama que está igual en local y en el remoto aparece **una sola vez** (en Local, con ☁); en Remoto solo quedan las que difieren o no tienes, y las iguales se agrupan en *n iguales a su rama local*.
+- Una rama que está igual en local y en el remoto aparece **una sola vez** (en Local, con ☁); en Remoto solo quedan las que difieren o no tienes. Filtrando por su nombre aparece también la remota.
 - El filtro se guarda por repositorio y se avisa en la búsqueda, en el panel y en la barra de estado.
 
 <table>

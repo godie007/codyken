@@ -4,11 +4,45 @@ description: Cambios relevantes de Codyken por fecha
 type: referencia
 tags:
   - changelog
-updated: 2026-10-27
+updated: 2026-10-30
 up: "[[00 - Inicio]]"
 ---
 
 # 📝 Historial de Cambios
+
+## 2026-10-30 — Eliminar varias ramas
+
+### Nuevo
+- ⌘‑clic (Ctrl en Windows y Linux) y Mayús‑clic seleccionan varias ramas en el panel; aparece una barra con *Eliminar…*. También con clic derecho sobre la selección, una carpeta, un remoto o la cabecera *Local*.
+- Un diálogo lista qué se elimina y qué no: nunca la rama actual, una abierta en otro worktree, la principal del remoto (`origin/HEAD`) ni la remota de la rama actual; esas se siguen pudiendo borrar una a una.
+- Las locales con commits sin integrar piden una segunda confirmación y, si no se acepta, se conservan junto con su remota. Las locales se recuperan con *Deshacer*; las remotas, no.
+
+### Cambios y arreglos
+- Se quita el cuadrito morado con la inicial del remoto de píldoras y panel; vuelve la nube ☁. Sustituye a la insignia descrita en la entrada siguiente.
+
+## 2026-10-30 — Una rama, una píldora
+
+Probado con una copia de INSPIA, donde parecía que solo había ramas remotas. No faltaba ninguna: tiene 2 locales y 13 solo remotas, pero estas salían punteadas con `origin/` y la local `main`, 32 commits atrás, quedaba fuera de la vista.
+
+### Cambios y arreglos
+- Gráfico: una rama igual en local y en varios remotos es una sola píldora, con 💻 y la insignia de cada remoto; antes `fork/x` salía aparte si la local seguía a `origin/x`.
+- Las ramas solo remotas salen sin `origin/` (cabe más nombre), con la insignia del remoto y sin el aspecto punteado. El nombre completo sigue en el *tooltip*.
+- Una rama desfasada muestra `↑n` / `↓n` en sus dos píldoras, así `main ↓32` explica desde arriba dónde está tu rama.
+- Panel: una rama sincronizada aparece solo en *Local*, con la insignia del remoto; se quitó la fila *«dev: igual que la local»* y *Remoto* cuenta solo lo que lista. Filtrando por su nombre aparece también la remota.
+- El menú de una rama local ofrece *Eliminar origin/x del remoto…*.
+
+## 2026-10-30 — Nombres de archivo largos
+
+Probado con el repo de INSPIA, cuyas fichas tienen nombres de hasta 100 caracteres.
+
+### Cambios y arreglos
+- Un nombre largo sacaba del panel los botones de la barra del diff (*Descartar*, *Preparar*, *Editar*, las vistas y *Cerrar*): el nombre no se podía recortar. Ahora ningún control queda fuera.
+- Los nombres se recortan por el medio (`BUG-065-subida-de-…a-en-fila.md`), así se ven el número y la extensión. Corrige la entrada anterior: el nombre ya sí puede recortarse. La ruta completa sigue en el *tooltip*.
+- Si el nombre tiene más de 24 caracteres y el panel mide 880 px o menos, la barra del diff usa dos filas para que el nombre se pueda leer.
+- La carpeta detrás del nombre se muestra solo si cabe y sin barras de más (antes salía `/frontend/coverage`).
+- Editor, Blame, Historial y Conflictos: la ruta larga ya se recorta y, si no cabe todo, los botones bajan de fila. Antes el editor se montaba sobre el panel derecho en ventanas pequeñas.
+- La lista del historial cede espacio al diff con ventana chica (máximo 40 % del panel).
+- Los avisos con rutas largas parten la línea en vez de desbordarse.
 
 ## 2026-10-27 — Scroll horizontal en el diff y hora de Colombia
 

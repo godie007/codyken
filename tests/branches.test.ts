@@ -92,6 +92,15 @@ describe('operaciones de arrastrar y soltar', () => {
   })
 })
 
+describe('rama principal del remoto', () => {
+  it('marca la rama a la que apunta origin/HEAD, y solo esa', async () => {
+    git('remote', 'set-head', 'origin', 'main')
+    const remotes = (await getRefs(dir)).filter((r) => r.type === 'remote')
+    expect(remotes.filter((r) => r.isDefault).map((r) => r.name)).toEqual(['origin/main'])
+    expect(remotes.some((r) => r.name === 'origin/HEAD')).toBe(false)
+  })
+})
+
 describe('rebase interactivo sobre otra rama', () => {
   it('lista los commits propios de la rama y los lleva encima de la otra', async () => {
     git('checkout', '-q', '-b', 'tema', 'main~1')

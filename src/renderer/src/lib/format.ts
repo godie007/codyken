@@ -39,6 +39,13 @@ export function repoName(path: string): string {
   return path.split('/').filter(Boolean).pop() ?? path
 }
 
+/** Parte un nombre para recortarlo por el medio: el final (con la extensión) nunca se corta */
+export function splitMiddle(name: string, tail = 12): { head: string; tail: string } {
+  const chars = Array.from(name)
+  if (chars.length <= tail * 2) return { head: name, tail: '' }
+  return { head: chars.slice(0, -tail).join(''), tail: chars.slice(-tail).join('') }
+}
+
 /** Para `.truncate-start`: marca el texto como izquierda a derecha, así la «/» inicial no salta al final */
 export function ltr(text: string): string {
   return `\u200E${text}\u200E`

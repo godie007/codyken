@@ -44,8 +44,9 @@ Clic derecho en el encabezado (o la flecha ▾) para elegir columnas.
 | Estilo | Significado |
 |---|---|
 | Relleno sólido con ✓ | Rama actual (HEAD) |
-| Borde del color del carril + barra izquierda | Rama local (💻; ☁ si la remota está en el mismo commit: es **una sola píldora** para las dos) |
-| Punteada, prefijo `origin/` atenuado | Solo existe en el remoto |
+| Borde del color del carril + barra izquierda | Rama local (💻; ☁ si la remota está en el mismo commit: es **una sola píldora**) |
+| Relleno suave, sin 💻 y con ☁ | Solo existe en el remoto; el nombre completo está en el *tooltip* |
+| `↑n` / `↓n` | Commits de diferencia entre la local y la remota que sigue; sale en sus dos píldoras |
 | Redondeada amarilla con 🏷 | Etiqueta (tag) |
 | `+n` | Hay más etiquetas en ese commit: al pasar el ratón se despliegan todas |
 

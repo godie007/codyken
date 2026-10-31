@@ -6,7 +6,7 @@ import { shortHash, splitPath } from '../lib/format'
 import { highlightCode, languageFor } from '../lib/highlight'
 import { buildPatch, supportsPartialStaging, type HunkPick } from '../lib/patch'
 import { Icon } from './Icons'
-import { StatusBadge, useToast } from './ui'
+import { FilePath, StatusBadge, useToast } from './ui'
 
 const LINE_LIMIT = 6000
 const HINT_KEY = 'codyken.diffHintHidden'
@@ -27,6 +27,8 @@ function writeFlag(key: string): void {
     // sin almacenamiento: el consejo vuelve a salir la próxima vez
   }
 }
+
+const LONG_NAME = 24
 
 export interface DiffViewProps {
   repo: string
@@ -259,13 +261,10 @@ export function DiffView(props: DiffViewProps) {
 
   return (
     <div className="diff-view">
-      <div className="diff-toolbar">
+      {/* Un nombre largo no cabe junto a los botones: pasa antes a dos filas para que se pueda leer */}
+      <div className={`diff-toolbar ${splitPath(source.path).name.length > LONG_NAME ? 'long-name' : ''}`}>
         <StatusBadge status={status} />
-        <span className="diff-path" title={source.path}>
-          {/* Como en la lista de archivos: el nombre siempre se ve y la carpeta, detrás, se recorta */}
-          <span className="diff-path-name">{splitPath(source.path).name}</span>
-          {splitPath(source.path).dir && <span className="diff-path-dir">/{splitPath(source.path).dir.slice(0, -1)}</span>}
-        </span>
+        <FilePath path={source.path} />
         <span className="diff-source truncate" title={label}>{label}</span>
         <span className="spacer" />
         {/* Grupos que, en un panel angosto, bajan juntos a su propia fila */}

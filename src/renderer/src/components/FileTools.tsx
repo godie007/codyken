@@ -5,7 +5,7 @@ import { formatFullDate, hashColor, relativeTime, shortHash } from '../lib/forma
 import { highlightCode, languageFor } from '../lib/highlight'
 import { DiffView } from './DiffView'
 import { Icon } from './Icons'
-import { Avatar, StatusBadge } from './ui'
+import { Avatar, FilePath, StatusBadge } from './ui'
 
 const BLAME_LIMIT = 8000
 
@@ -45,7 +45,7 @@ export function FileHistory(props: FileHistoryProps) {
     <div className="file-tool">
       <div className="diff-toolbar">
         <Icon.History size={15} />
-        <span className="diff-path truncate">Historial de {props.path}</span>
+        <FilePath path={props.path} prefix="Historial de" />
         {entries && <span className="diff-source">{entries.length} {entries.length === 1 ? 'commit' : 'commits'}</span>}
         <span className="spacer" />
         <button className="btn btn-sm" onClick={() => props.onBlame(null)}><Icon.Blame size={13} /> Blame</button>
@@ -140,7 +140,7 @@ export function BlameView(props: BlameViewProps) {
     <div className="file-tool">
       <div className="diff-toolbar">
         <Icon.Blame size={15} />
-        <span className="diff-path truncate">Blame de {props.path}</span>
+        <FilePath path={props.path} prefix="Blame de" />
         <span className="diff-source">{props.rev ? `en ${shortHash(props.rev)}` : 'versión actual'}</span>
         {lines && <span className="diff-source">{lines.length} líneas · {authors} {authors === 1 ? 'autor' : 'autores'}</span>}
         <span className="spacer" />

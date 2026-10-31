@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type HTMLAttributes, type MouseEvent, type ReactNode } from 'react'
 import type { GraphFilter, LfsInfo, PullRequest, PullRequestInfo, Ref, Remote, StashEntry, Worktree } from '../../../shared/types'
+import { mod } from '../api'
 import { relativeTime } from '../lib/format'
 import { REF_MIME } from '../lib/drop'
 import { buildTree, remoteBranchName, type TreeNode } from '../lib/refs'
@@ -13,9 +14,14 @@ export interface LeftPanelProps {
   filter: GraphFilter
   selectedStash: number | null
   filterFocus: number
+  /** Al cambiar se vacía la selección de ramas */
+  selectionReset: number
   onSelectRef: (ref: Ref) => void
   onActivateRef: (ref: Ref) => void
   onRefMenu: (ref: Ref) => void
+  /** Menú de varias ramas: selección, carpeta o remoto. `onSelect` las selecciona, si procede */
+  onBranchesMenu: (refs: Ref[], title?: string, onSelect?: () => void) => void
+  onDeleteBranches: (refs: Ref[]) => void
   onHoverRef: (ref: Ref | null) => void
   onToggleHidden: (refs: Ref[]) => void
   onClearFilter: () => void
@@ -94,6 +100,8 @@ export function LeftPanel(props: LeftPanelProps) {
   const [filter, setFilter] = useState('')
   const filterInput = useRef<HTMLInputElement>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['tags']))
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [anchor, setAnchor] = useState<string | null>(null)
   const q = filter.trim().toLowerCase()
   const match = (text: string): boolean => !q || text.toLowerCase().includes(q)
 
@@ -109,6 +117,44 @@ export function LeftPanel(props: LeftPanelProps) {
       return next
     })
   const isOpen = (key: string): boolean => !!q || !collapsed.has(key)
+
+  // Solo las que siguen existiendo: al eliminar una rama sale sola de la selección
+  const selectedRefs = props.refs.filter((r) => selected.has(r.fullName))
+  useEffect(() => setSelected(new Set()), [props.selectionReset])
+  const clearSelection = (): void => setSelected(new Set())
+  useEffect(() => {
+    if (!selected.size) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setSelected(new Set())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected.size])
+  // Las ramas en el orden en que se ven, para seleccionar un rango con Mayús
+  const visibleBranches: Ref[] = []
+  const clickRow = (ref: Ref, e: MouseEvent<HTMLElement>): void => {
+    if (ref.type !== 'tag' && (e.metaKey || e.ctrlKey)) {
+      const next = new Set(selected)
+      if (next.has(ref.fullName)) next.delete(ref.fullName)
+      else next.add(ref.fullName)
+      setSelected(next)
+      setAnchor(ref.fullName)
+    } else if (ref.type !== 'tag' && e.shiftKey && anchor) {
+      const from = visibleBranches.findIndex((r) => r.fullName === anchor)
+      const to = visibleBranches.findIndex((r) => r.fullName === ref.fullName)
+      if (from < 0 || to < 0) return
+      setSelected(new Set(visibleBranches.slice(Math.min(from, to), Math.max(from, to) + 1).map((r) => r.fullName)))
+    } else {
+      clearSelection()
+      setAnchor(ref.fullName)
+      props.onSelectRef(ref)
+    }
+  }
+  const rowMenu = (ref: Ref): void => {
+    if (selected.has(ref.fullName) && selectedRefs.length > 1) props.onBranchesMenu(selectedRefs)
+    else props.onRefMenu(ref)
+  }
+  const select = (refs: Ref[]) => () => setSelected(new Set(refs.map((r) => r.fullName)))
 
   const locals = useMemo(() => props.refs.filter((r) => r.type === 'local'), [props.refs])
   const remoteGroups = useMemo(() => {
@@ -136,28 +182,27 @@ export function LeftPanel(props: LeftPanelProps) {
     }
     return map
   }, [props.refs, locals])
-  // Remotas en el mismo commit que su rama local: se muestran una sola vez, en Local (con la nube de «al día»)
+  // Remotas en el mismo commit que su rama local: es la misma rama, se muestra una sola vez, en Local
   const syncedRemotes = useMemo(() => {
     const set = new Set<string>()
     for (const remote of props.refs) {
       if (remote.type !== 'remote') continue
-      const twin = locals.find((l) => l.upstream === remote.name) ?? locals.find((l) => !l.upstream && l.name === remoteBranchName(remote))
-      if (twin && twin.hash === remote.hash) set.add(remote.fullName)
+      // El mismo criterio que une las etiquetas del gráfico
+      if (locals.some((l) => l.hash === remote.hash && (l.upstream === remote.name || l.name === remoteBranchName(remote)))) set.add(remote.fullName)
     }
     return set
   }, [props.refs, locals])
-  const [showSynced, setShowSynced] = useState<Set<string>>(new Set())
   const localTree = useMemo(() => buildTree(locals.filter((r) => match(r.name)), (r) => r.name), [locals, q])
-  const remoteCount = [...remoteGroups.values()].reduce((n, l) => n + l.length, 0)
+  const remoteCount = [...remoteGroups.values()].reduce((n, l) => n + l.filter((r) => !syncedRemotes.has(r.fullName)).length, 0)
 
   const hidden = new Set(props.filter.hidden)
   const solo = new Set(props.filter.solo)
   const isHidden = (ref: Ref): boolean => (solo.size ? !solo.has(ref.fullName) && !ref.isHead : hidden.has(ref.fullName))
   const filtered = hidden.size > 0 || solo.size > 0
 
-  const section = (id: SectionId, title: string, count: number, icon: ReactNode, children: ReactNode, extra?: ReactNode): ReactNode => (
+  const section = (id: SectionId, title: string, count: number, icon: ReactNode, children: ReactNode, extra?: ReactNode, onMenu?: () => void): ReactNode => (
     <div className="lp-section">
-      <div className="lp-section-header" onClick={() => toggle(id)}>
+      <div className="lp-section-header" onClick={() => toggle(id)} onContextMenu={onMenu && ((e) => (e.preventDefault(), onMenu()))}>
         {isOpen(id) ? <Icon.ChevronDown size={13} /> : <Icon.ChevronRight size={13} />}
         {icon}
         <span className="lp-section-title">{title}</span>
@@ -172,13 +217,16 @@ export function LeftPanel(props: LeftPanelProps) {
 
   const renderTree = (nodes: TreeNode<Ref>[], depth: number, keyPrefix: string): ReactNode =>
     nodes.map((node) => {
-      if (node.item) return <RefRow key={node.item.fullName} refItem={node.item} label={node.name} depth={depth} hidden={isHidden(node.item)} twin={localTwins.get(node.item.fullName)} props={props} />
+      if (node.item) {
+        visibleBranches.push(node.item)
+        return <RefRow key={node.item.fullName} refItem={node.item} label={node.name} depth={depth} hidden={isHidden(node.item)} twin={localTwins.get(node.item.fullName)} selected={selected.has(node.item.fullName)} onRowClick={clickRow} onRowMenu={rowMenu} props={props} />
+      }
       const key = `${keyPrefix}/${node.path}`
       const folderRefs = leaves(node.children)
       const allHidden = folderRefs.every(isHidden)
       return (
         <div key={key}>
-          <div className={`lp-row lp-folder ${allHidden ? 'is-hidden' : ''}`} style={{ paddingLeft: 12 + depth * 14 }} onClick={() => toggle(key)}>
+          <div className={`lp-row lp-folder ${allHidden ? 'is-hidden' : ''}`} style={{ paddingLeft: 12 + depth * 14 }} onClick={() => toggle(key)} onContextMenu={(e) => (e.preventDefault(), props.onBranchesMenu(folderRefs, node.name, select(folderRefs)))}>
             {isOpen(key) ? <Icon.ChevronDown size={12} /> : <Icon.ChevronRight size={12} />}
             <Icon.Folder size={13} />
             <span className="truncate">{node.name}</span>
@@ -211,9 +259,18 @@ export function LeftPanel(props: LeftPanelProps) {
           <button className="link" onClick={props.onClearFilter}>Mostrar todas</button>
         </div>
       )}
+      {selectedRefs.length > 0 && (
+        <div className="lp-filter-banner lp-selection-banner">
+          <span>{selectedRefs.length} {selectedRefs.length === 1 ? 'seleccionada' : 'seleccionadas'}</span>
+          <button className="link" onClick={() => props.onDeleteBranches(selectedRefs)}>Eliminar…</button>
+          <button className="link" onClick={clearSelection}>Cancelar</button>
+        </div>
+      )}
       <div className="lp-scroll" onMouseLeave={() => props.onHoverRef(null)}>
         {section('local', 'Local', locals.length, <Icon.Laptop size={14} />,
-          localTree.length ? renderTree(localTree, 0, 'local') : <div className="lp-empty">Sin ramas locales</div>
+          localTree.length ? renderTree(localTree, 0, 'local') : <div className="lp-empty">Sin ramas locales</div>,
+          undefined,
+          () => props.onBranchesMenu(locals, 'Local', select(locals))
         )}
         {section('remote', 'Remoto', remoteCount, <Icon.Cloud size={14} />,
           remoteGroups.size === 0 ? (
@@ -228,15 +285,7 @@ export function LeftPanel(props: LeftPanelProps) {
                 query={q}
                 match={match}
                 synced={syncedRemotes}
-                showSynced={showSynced.has(name)}
-                onToggleSynced={() =>
-                  setShowSynced((set) => {
-                    const next = new Set(set)
-                    if (next.has(name)) next.delete(name)
-                    else next.add(name)
-                    return next
-                  })
-                }
+                onSelect={select}
                 isOpen={isOpen}
                 toggle={toggle}
                 isHidden={isHidden}
@@ -254,7 +303,7 @@ export function LeftPanel(props: LeftPanelProps) {
           </>
         )}
         {section('tags', 'Etiquetas', tags.length, <Icon.Tag size={14} />,
-          tags.length === 0 ? <div className="lp-empty">Sin etiquetas</div> : tags.filter((t) => match(t.name)).map((t) => <RefRow key={t.fullName} refItem={t} label={t.name} depth={0} hidden={isHidden(t)} props={props} />)
+          tags.length === 0 ? <div className="lp-empty">Sin etiquetas</div> : tags.filter((t) => match(t.name)).map((t) => <RefRow key={t.fullName} refItem={t} label={t.name} depth={0} hidden={isHidden(t)} selected={false} onRowClick={clickRow} onRowMenu={rowMenu} props={props} />)
         )}
         {section('stashes', 'Stashes', props.stashes.length, <Icon.Stash size={14} />,
           props.stashes.length === 0 ? (
@@ -325,15 +374,14 @@ export function LeftPanel(props: LeftPanelProps) {
   )
 }
 
-function RemoteGroup({ name, refs, host, query, match, synced, showSynced, onToggleSynced, isOpen, toggle, isHidden, renderTree, props }: {
+function RemoteGroup({ name, refs, host, query, match, synced, onSelect, isOpen, toggle, isHidden, renderTree, props }: {
   name: string
   refs: Ref[]
   host?: string
   query: string
   match: (text: string) => boolean
   synced: Set<string>
-  showSynced: boolean
-  onToggleSynced: () => void
+  onSelect: (refs: Ref[]) => () => void
   isOpen: (key: string) => boolean
   toggle: (key: string) => void
   isHidden: (ref: Ref) => boolean
@@ -344,7 +392,6 @@ function RemoteGroup({ name, refs, host, query, match, synced, showSynced, onTog
   const drop = useDropZone((source) => props.onRefDrop(source, { kind: 'remote', remote: name }))
   const matching = refs.filter((r) => match(r.name))
   // Al filtrar se muestran todas las que coinciden, también las que están al día con su local
-  const inSync = query ? [] : matching.filter((r) => synced.has(r.fullName))
   const listed = query ? matching : matching.filter((r) => !synced.has(r.fullName))
   const tree = buildTree(listed, (r) => r.name.slice(name.length + 1))
   if (query && tree.length === 0) return null
@@ -356,30 +403,21 @@ function RemoteGroup({ name, refs, host, query, match, synced, showSynced, onTog
         style={{ paddingLeft: 12 }}
         onClick={() => toggle(key)}
         title={`${name}${host ? ` · ${host}` : ''}\nSuelta aquí una rama local para subirla a ${name}`}
+        onContextMenu={(e) => (e.preventDefault(), props.onBranchesMenu(listed, name, onSelect(listed)))}
         {...drop.handlers}
       >
         {isOpen(key) ? <Icon.ChevronDown size={12} /> : <Icon.ChevronRight size={12} />}
-        <span className="remote-avatar">{name[0]?.toUpperCase()}</span>
+        <Icon.Cloud size={13} />
         <span className="truncate">{name}</span>
         {host && <span className="remote-host truncate">{host}</span>}
-        <span className="lp-folder-count">{refs.length}</span>
+        <span className="lp-folder-count">{refs.filter((r) => !synced.has(r.fullName)).length}</span>
         {refs.length > 0 && <EyeButton hidden={allHidden} onClick={() => props.onToggleHidden(refs)} />}
       </div>
       {isOpen(key) && (
         <>
           {tree.length > 0 && renderTree(tree, 1, key)}
           {refs.length === 0 && <div className="lp-empty" style={{ paddingLeft: 40 }}>Haz fetch para ver sus ramas</div>}
-          {inSync.length > 0 && (
-            <>
-              <div className="lp-row lp-synced-toggle" style={{ paddingLeft: 40 }} onClick={onToggleSynced} title="Están en el mismo commit que su rama local: se muestran en Local como una sola rama">
-                {showSynced ? <Icon.ChevronDown size={12} /> : <Icon.ChevronRight size={12} />}
-                <span className="truncate">
-                  {inSync.length === 1 ? `${remoteBranchName(inSync[0])}: igual que la local` : `${inSync.length} iguales a su rama local`}
-                </span>
-              </div>
-              {showSynced && renderTree(buildTree(inSync, (r) => r.name.slice(name.length + 1)), 2, `${key}/synced`)}
-            </>
-          )}
+          {refs.length > 0 && tree.length === 0 && <div className="lp-empty" style={{ paddingLeft: 40 }}>Todas sus ramas están al día en Local</div>}
         </>
       )}
     </div>
@@ -401,14 +439,14 @@ function EyeButton({ hidden, onClick }: { hidden: boolean; onClick: () => void }
   )
 }
 
-function RefRow({ refItem, label, depth, hidden, twin, props }: { refItem: Ref; label: string; depth: number; hidden: boolean; twin?: string; props: LeftPanelProps }) {
+function RefRow({ refItem, label, depth, hidden, twin, selected, onRowClick, onRowMenu, props }: { refItem: Ref; label: string; depth: number; hidden: boolean; twin?: string; selected: boolean; onRowClick: (ref: Ref, e: MouseEvent<HTMLElement>) => void; onRowMenu: (ref: Ref) => void; props: LeftPanelProps }) {
   const isLocal = refItem.type === 'local'
   const synced = isLocal && !!refItem.upstream && !refItem.gone && !refItem.ahead && !refItem.behind
   const isBranch = refItem.type !== 'tag'
   const drop = useDropZone((source) => source !== refItem.fullName && props.onRefDrop(source, { kind: 'ref', ref: refItem }))
   return (
     <div
-      className={`lp-row ${refItem.isHead ? 'head' : ''} ${hidden ? 'is-hidden' : ''} ${drop.active ? 'drop-target' : ''}`}
+      className={`lp-row ${refItem.isHead ? 'head' : ''} ${hidden ? 'is-hidden' : ''} ${selected ? 'selected' : ''} ${drop.active ? 'drop-target' : ''}`}
       style={{ paddingLeft: 28 + depth * 14 }}
       draggable={isBranch}
       onDragStart={(e) => {
@@ -417,11 +455,11 @@ function RefRow({ refItem, label, depth, hidden, twin, props }: { refItem: Ref; 
         e.dataTransfer.effectAllowed = 'move'
       }}
       {...(isBranch ? drop.handlers : {})}
-      onClick={() => props.onSelectRef(refItem)}
+      onClick={(e) => onRowClick(refItem, e)}
       onDoubleClick={() => props.onActivateRef(refItem)}
-      onContextMenu={(e) => (e.preventDefault(), props.onRefMenu(refItem))}
+      onContextMenu={(e) => (e.preventDefault(), onRowMenu(refItem))}
       onMouseEnter={() => props.onHoverRef(refItem)}
-      title={`${refItem.upstream ? `${refItem.name} → ${refItem.upstream}${synced ? ' (al día: es la misma rama en tu equipo y en el remoto)' : ''}` : refItem.name}${isBranch ? '\nArrástrala sobre otra rama o un remoto: merge, rebase, push, pull request' : ''}`}
+      title={`${refItem.upstream ? `${refItem.name} → ${refItem.upstream}${synced ? ' (al día: es la misma rama en tu equipo y en el remoto)' : ''}` : refItem.name}${isBranch ? `\nArrástrala sobre otra rama o un remoto: merge, rebase, push, pull request\n${mod}clic o Mayús+clic: seleccionar varias` : ''}`}
     >
       {refItem.isHead ? <Icon.Check size={13} strokeWidth={2.6} className="head-icon" /> : refItem.type === 'tag' ? <Icon.Tag size={13} /> : <Icon.Branch size={13} />}
       <span className="truncate">{label}</span>

@@ -5,7 +5,7 @@ import { detectEol, detectIndent, indentEdit, lineColumn, newlineEdit, offsetOfL
 import { highlightCode, languageFor } from '../lib/highlight'
 import { lineMarks } from '../lib/linediff'
 import { Icon } from './Icons'
-import { usePrompt, useToast } from './ui'
+import { FilePath, usePrompt, useToast } from './ui'
 
 /** Tienen que coincidir con .fe-highlight / .fe-input en styles.css */
 const LINE_HEIGHT = 20
@@ -321,7 +321,7 @@ export function FileEditor({ repo, request, version, onClose, onSwitch, onSaved,
     <div className="file-tool file-editor" onKeyDown={(e) => editorShortcut(e) && e.stopPropagation()}>
       <div className="diff-toolbar">
         <Icon.Edit size={15} />
-        <span className="diff-path truncate" title={path}>{path}</span>
+        <FilePath path={path} />
         <span className={`diff-source ${target === 'index' ? 'fe-target-index' : ''}`}>{target === 'working' ? 'Archivo de trabajo' : 'Versión preparada'}</span>
         {dirty && <span className="fe-dirty" title="Cambios sin guardar">●</span>}
         <span className="spacer" />

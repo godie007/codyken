@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Commit, CommitDetail, Comparison, DiffSource, FileChange, RepoState, StashEntry, WorkingStatus } from '../../../shared/types'
 import { api, mod } from '../api'
-import { formatFullDate, relativeTime, shortHash, splitPath } from '../lib/format'
+import { formatFullDate, ltr, relativeTime, shortHash, splitPath } from '../lib/format'
 import { buildTree, type TreeNode } from '../lib/refs'
 import { Icon } from './Icons'
-import { Avatar, StatusBadge } from './ui'
+import { Avatar, FileName, StatusBadge } from './ui'
 
 /** Un extremo de una comparación: el SHA y cómo mostrarlo (nombre de rama o SHA corto) */
 export interface CompareEnd {
@@ -313,8 +313,8 @@ function FileRow({ file, active, onClick, onContextMenu, actions, depth = 0, lab
     >
       <StatusBadge status={file.status} />
       <span className="file-name truncate">
-        <span className="file-base">{label ?? name}</span>
-        {!label && dir && <span className="file-dir">{dir}</span>}
+        <FileName name={label ?? name} className="file-base" />
+        {!label && dir && <span className="file-dir truncate-start">{ltr(dir.slice(0, -1))}</span>}
       </span>
       {actions && (
         <span className="file-actions" onClick={(e) => e.stopPropagation()}>

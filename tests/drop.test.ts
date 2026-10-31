@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Ref } from '../src/shared/types'
 import { dropTargetRef, planDrop, type DropContext, type DropTarget } from '../src/renderer/src/lib/drop'
-import { labelsByCommit, type RefLabel } from '../src/renderer/src/lib/refs'
+import { labelsByCommit, labelText, labelTrack, type RefLabel } from '../src/renderer/src/lib/refs'
 
 const local = (name: string, hash: string, extra: Partial<Ref> = {}): Ref => ({ type: 'local', name, fullName: `refs/heads/${name}`, hash, ...extra })
 const remote = (name: string, hash: string): Ref => ({ type: 'remote', name, fullName: `refs/remotes/${name}`, hash, remote: name.split('/')[0] })
@@ -34,6 +34,31 @@ describe('etiquetas del gráfico', () => {
     const map = labelsByCommit([local('fix', 'x1', { upstream: 'origin/fix-login' }), remote('origin/fix-login', 'x1')], null)
     const [label] = map.get('x1')!
     expect(label.remotes.map((r) => r.name)).toEqual(['origin/fix-login'])
+  })
+})
+
+describe('una rama, una etiqueta', () => {
+  it('une una rama con el mismo nombre en varios remotos, aunque siga solo a uno', () => {
+    const map = labelsByCommit([local('main', 'm1', { upstream: 'origin/main' }), remote('origin/main', 'm1'), remote('fork/main', 'm1')], null)
+    expect(map.get('m1')!.length).toBe(1)
+    expect(map.get('m1')![0].remotes.map((r) => r.name)).toEqual(['origin/main', 'fork/main'])
+  })
+
+  it('une las remotas iguales de una rama que no existe en local y la nombra sin el remoto', () => {
+    const map = labelsByCommit([remote('origin/deploy/ios', 'd1'), remote('fork/deploy/ios', 'd1'), remote('origin/otra', 'd1')], null)
+    const labels = map.get('d1')!
+    expect(labels.map(labelText)).toEqual(['deploy/ios', 'otra'])
+    expect(labels[0].remotes.length).toBe(2)
+  })
+
+  it('una remota por delante de su local muestra los commits de diferencia', () => {
+    const map = labelsByCommit([local('main', 'viejo', { upstream: 'origin/main', behind: 32, isHead: true }), remote('origin/main', 'nuevo'), remote('origin/ajena', 'nuevo')], null)
+    const [main, ajena] = map.get('nuevo')!
+    expect(main.localTwin?.name).toBe('main')
+    expect(labelTrack(main)).toEqual({ ahead: 0, behind: 32 })
+    expect(labelTrack(map.get('viejo')![0])).toEqual({ ahead: 0, behind: 32 })
+    expect(ajena.localTwin).toBeUndefined()
+    expect(labelTrack(ajena)).toEqual({ ahead: 0, behind: 0 })
   })
 })
 

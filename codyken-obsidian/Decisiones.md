@@ -71,7 +71,7 @@ up: "[[00 - Inicio]]"
 
 ## Una sola entrada para local y remota iguales
 
-**Decisión:** si una rama local y su remota están en el mismo commit, se muestran una sola vez: una etiqueta combinada en el gráfico (uniendo primero por la rama que sigue y luego por el nombre) y, en el panel, solo en *Local*; en *Remoto* se agrupan plegadas en *n iguales a su rama local*.
+**Decisión:** si una rama local y su remota están en el mismo commit, se muestran una sola vez: una etiqueta combinada en el gráfico (uniendo primero por la rama que sigue y luego por el nombre) y, en el panel, solo en *Local*; en *Remoto* solo aparecen al filtrar por su nombre.
 **Motivo:** verlas duplicadas hacía pensar que eran dos ramas distintas y llenaba el panel en repos con muchas ramas al día. Las que difieren o solo existen en el remoto siguen visibles, que es la información útil.
 **Consecuencia:** al filtrar por texto se muestran todas las coincidencias, también las agrupadas, para que la búsqueda no esconda nada.
 

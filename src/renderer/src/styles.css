@@ -1042,14 +1042,16 @@ pre {
 .pill-head .pill-icon {
   opacity: 0.8;
 }
+/* Solo en el remoto: es una rama igual de real, se distingue por no llevar el portátil y por el relleno más suave */
 .pill-remote {
-  background: transparent;
-  border-style: dashed;
+  background: color-mix(in srgb, var(--pill) 8%, var(--bg-graph));
   box-shadow: none;
-  color: var(--text-muted);
 }
-.pill-remote-prefix {
-  opacity: 0.6;
+.pill-track {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .pill-tag {
   border-radius: 10px;
@@ -1227,20 +1229,31 @@ pre {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  /* La carpeta que no cabe baja a una segunda línea invisible, en vez de dejar un resto como «…ugs» */
+  flex-wrap: wrap;
+  max-height: 1lh;
+}
+.file-name-text {
+  display: flex;
+  min-width: 0;
+  white-space: pre;
+}
+.file-name-head {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-name-tail {
+  flex: none;
 }
 .file-base {
-  flex: none;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 1 auto;
 }
 .file-dir {
+  flex: 1 1 72px;
   color: var(--text-faint);
   font-size: 11.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  direction: rtl;
-  text-align: left;
 }
 .file-actions {
   display: none;
@@ -1328,6 +1341,31 @@ pre {
     display: none;
   }
 }
+/* Las mismas dos filas de abajo, antes, si el nombre es largo */
+@container diff-view (max-width: 880px) {
+  .diff-view .diff-toolbar.long-name {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .diff-view .diff-toolbar.long-name > .diff-path {
+    flex: 1 1 0;
+  }
+  .diff-view .diff-toolbar.long-name > .spacer {
+    display: none;
+  }
+  .diff-view .diff-toolbar.long-name > .diff-close {
+    order: 1;
+  }
+  .diff-view .diff-toolbar.long-name > .diff-tool-group {
+    order: 2;
+  }
+  .diff-view .diff-toolbar.long-name::after {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+    margin-top: -6px;
+  }
+}
 /* Panel muy angosto (ventana chica con los dos paneles laterales): mejor dos filas ordenadas que botones cortados */
 @container diff-view (max-width: 700px) {
   .diff-view .diff-toolbar {
@@ -1335,7 +1373,7 @@ pre {
     row-gap: 6px;
   }
   .diff-view .diff-toolbar > .diff-path {
-    flex: 1 1 auto;
+    flex: 1 1 0;
   }
   .diff-view .diff-toolbar > .spacer {
     display: none;
@@ -1346,6 +1384,8 @@ pre {
   }
   .diff-view .diff-toolbar > .diff-tool-group {
     order: 2;
+    flex-wrap: wrap;
+    max-width: 100%;
   }
   /* Salto de línea después de cerrar */
   .diff-view .diff-toolbar::after {
@@ -1372,7 +1412,7 @@ pre {
   padding: 6px 10px 6px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
-  /* Una sola fila: la ruta se recorta antes que los botones */
+  /* Una sola fila: la ruta se recorta antes que los botones, que nunca salen del panel */
   flex-wrap: nowrap;
   min-width: 0;
 }
@@ -1395,8 +1435,8 @@ pre {
   min-width: 24px;
 }
 .diff-toolbar > .diff-path {
-  flex: 0 1 auto;
-  min-width: min-content;
+  flex: 0 1000 auto;
+  min-width: 96px;
 }
 .diff-path {
   display: flex;
@@ -1404,16 +1444,29 @@ pre {
   gap: 6px;
   min-width: 0;
   white-space: nowrap;
+  /* Como en .file-name: la carpeta que no cabe desaparece entera */
+  flex-wrap: wrap;
+  max-height: 1lh;
+  overflow: hidden;
+}
+.diff-path-main {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.diff-path-prefix {
+  flex: none;
+  color: var(--text-muted);
 }
 .diff-path-dir {
-  min-width: 0;
+  flex: 1 1 72px;
   font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   color: var(--text-muted);
 }
 .diff-path-name {
-  flex: none;
+  flex: 0 1 auto;
   font-weight: 600;
 }
 .diff-source {
@@ -1862,6 +1915,7 @@ mark.hl-del {
 }
 .toast-title {
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .toast-detail {
   margin-top: 4px;
@@ -2021,6 +2075,63 @@ mark.hl-del {
   color: var(--warn);
   font-size: 12px;
 }
+.lp-selection-banner {
+  background: var(--select-bg);
+  color: var(--text);
+}
+.lp-selection-banner .link {
+  margin-left: 0;
+}
+.lp-selection-banner .link:first-of-type {
+  margin-left: auto;
+  color: var(--danger);
+}
+.lp-row.selected {
+  background: var(--select-bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.bulk-delete {
+  max-width: 520px;
+}
+.bulk-body {
+  max-height: 300px;
+  overflow: auto;
+}
+.bulk-title {
+  margin: 10px 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.bulk-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bulk-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.bulk-note {
+  flex: none;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.bulk-warning {
+  margin-top: 10px;
+  color: var(--danger);
+  font-size: 12px;
+}
+.bulk-hint {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
 .lp-filter-banner .link {
   margin-left: auto;
   color: var(--text);
@@ -2047,19 +2158,6 @@ mark.hl-del {
 .lp-remote {
   color: var(--text);
   font-weight: 600;
-}
-.remote-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  background: var(--mk-purple);
-  color: var(--mk-bg);
-  font-size: 10.5px;
-  font-weight: 800;
 }
 .remote-host {
   color: var(--text-faint);
@@ -2126,13 +2224,28 @@ mark.hl-del {
   flex-direction: column;
   background: var(--bg-graph);
 }
+/* Editor, blame, historial y conflictos: la ruta ocupa lo que sobra y, si no cabe todo, los botones bajan de fila */
+.file-tool > .diff-toolbar {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.file-tool > .diff-toolbar > .diff-path {
+  flex: 1 1 140px;
+}
+.file-tool > .diff-toolbar > .diff-path:has(.diff-path-prefix) {
+  flex-basis: 260px;
+}
+.file-tool > .diff-toolbar > .spacer {
+  display: none;
+}
 .file-tool-body {
   flex: 1;
   min-height: 0;
   display: flex;
 }
 .history-list {
-  width: 320px;
+  /* Con ventana chica, el diff de al lado también necesita sitio */
+  width: min(320px, 40%);
   flex: none;
   overflow: auto;
   border-right: 1px solid var(--border);
@@ -3019,13 +3132,6 @@ mark.hl-del {
 .lp-row.drop-target {
   background: color-mix(in srgb, var(--mk-yellow) 14%, transparent);
   box-shadow: inset 0 0 0 1px var(--mk-yellow);
-}
-.lp-synced-toggle {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.lp-synced-toggle:hover {
-  color: var(--text);
 }
 
 /* ── Editor de archivos ─────────────────────────────────────────────────── */

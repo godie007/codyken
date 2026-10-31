@@ -4,6 +4,7 @@ import { api } from '../api'
 import { hasMarkers, joinResult, parseConflicts, resultLines, toggleSide, wholeFileConflict, type Choice, type ParsedConflict, type Side } from '../lib/conflict'
 import { highlightCode, languageFor } from '../lib/highlight'
 import { Icon } from './Icons'
+import { FilePath } from './ui'
 import { useToast } from './ui'
 
 /** Tramos iguales más largos que esto se pliegan, dejando unas líneas de contexto */
@@ -183,7 +184,7 @@ export function MergeEditor({ repo, path, currentBranch, onClose, onSaved, onRes
     <div className="file-tool merge-editor">
       <div className="diff-toolbar">
         <Icon.Merge3 size={15} />
-        <span className="diff-path truncate">Resolver {path}</span>
+        <FilePath path={path} prefix="Resolver" />
         {parsed && total > 0 && (
           <span className={`diff-source ${resolved === total ? 'ok-text' : ''}`}>
             {resolved}/{total} {total === 1 ? 'resuelto' : 'resueltos'}

@@ -286,10 +286,14 @@ export async function getRefs(repo: string): Promise<Ref[]> {
     'refs/heads', 'refs/remotes', 'refs/tags'
   ])
   const refs: Ref[] = []
+  const defaults = new Set<string>()
   for (const line of out.split('\n')) {
     if (!line) continue
     const [fullName, objectName, peeled, upstream, track, head, symref] = line.split(FS)
-    if (symref) continue
+    if (symref) {
+      defaults.add(symref)
+      continue
+    }
     const hash = peeled || objectName
     if (fullName.startsWith('refs/heads/')) {
       const ahead = /ahead (\d+)/.exec(track)
@@ -312,6 +316,7 @@ export async function getRefs(repo: string): Promise<Ref[]> {
       refs.push({ type: 'tag', name: fullName.slice('refs/tags/'.length), fullName, hash })
     }
   }
+  for (const ref of refs) if (defaults.has(ref.fullName)) ref.isDefault = true
   return refs
 }
 

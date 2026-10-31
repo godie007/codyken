@@ -52,6 +52,8 @@ export interface Ref {
   behind?: number
   gone?: boolean
   isHead?: boolean
+  /** Rama principal del remoto (a la que apunta `origin/HEAD`) */
+  isDefault?: boolean
 }
 
 export interface StashEntry {
