@@ -33,6 +33,8 @@ Componente: `src/renderer/src/components/CommitPanel.tsx`. Cambia según la sele
 
 El borrador del mensaje se conserva por repositorio mientras la app esté abierta, y es el mismo que se edita en la fila `// WIP` del gráfico.
 
+![[cambios.png]]
+
 ## Mensaje de un commit
 
 `lib/commitmessage.ts` interpreta el mensaje sin perder texto y `CommitMessage.tsx` lo muestra:
@@ -42,7 +44,7 @@ El borrador del mensaje se conserva por repositorio mientras la app esté abiert
 - **Coautores y firmas:** el último grupo de líneas tipo `Co-Authored-By:` sale aparte, con avatar y sin el correo, que queda en el *tooltip*.
 - **Mensajes largos:** a partir de 700 caracteres el cuerpo se pliega con *Ver todo el mensaje*, para que los archivos sigan a mano.
 
-![[cambios.png]]
+![[mensaje-commit.png]]
 
 ## Con un commit seleccionado
 

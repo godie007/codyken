@@ -4,7 +4,7 @@ description: Zonas de la ventana de Codyken, barra de acciones, pestañas y pant
 type: interfaz
 tags:
   - interfaz
-updated: 2026-10-20
+updated: 2026-10-30
 up: "[[00 - Inicio]]"
 next: "[[04 - Interfaz/Repositorios Recientes]]"
 related:
@@ -22,7 +22,7 @@ related:
 | Panel izquierdo | `LeftPanel.tsx` | [[04 - Interfaz/Panel Izquierdo]] |
 | Centro | `GraphView` / `DiffView` / `FileHistory` / `BlameView` | El [[04 - Interfaz/Gráfico de Commits\|gráfico]]; lo reemplaza el [[04 - Interfaz/Diff, Historial y Blame\|diff, historial o blame]] (Esc vuelve) |
 | Panel derecho | `CommitPanel.tsx` | [[04 - Interfaz/Panel Derecho]] |
-| Barra de estado | `RepoView.tsx` | Ruta, rama → remota con ↑/↓, HEAD desacoplado, operación en curso, ramas ocultas (clic para mostrarlas), último fetch, total de commits cargados |
+| Barra de estado | `RepoView.tsx` | Ruta, rama → remota con ↑/↓, HEAD desacoplado, operación en curso, último fetch, total de commits cargados |
 
 Los paneles laterales se redimensionan arrastrando el borde y se ocultan con ⌘J / ⌘K.
 

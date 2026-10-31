@@ -21,7 +21,12 @@ Las capturas usan un repo con esta forma (créalo con git en cualquier carpeta t
 - etiqueta `v1.0.0`;
 - un remoto `origin` **bare local** con las ramas subidas y `main` 3 commits por delante;
 - un stash *"Experimento con notas"* que solo contiene un archivo nuevo (`-u`);
-- cambios sin confirmar: `app.js` modificado y `nuevo.txt` nuevo.
+- cambios sin confirmar: `app.js` modificado y `nuevo.txt` nuevo;
+- `feature/pagos` abierta en un worktree `demo-pagos` (hace falta para el diálogo de *Eliminar varias ramas*; se quita para `ocultar-ramas.png`, ver [[Limitaciones Conocidas]]).
+
+Las capturas de otras situaciones salen de repos aparte: `ramas` (arrastrar, Fetch y rebase sobre otra rama), `tienda-web` (rebase, rehacer y LFS), `api-pagos` (conflicto), `tienda-editor` (editor y quitar líneas) y `portal` (`mensaje-commit.png`).
+
+Para que la barra de estado muestre `~/…`, los repos deben vivir bajo tu carpeta personal. Antes de una captura pública, revisa que `recent` en `$TMPDIR/codyken-snapshot/settings.json` no tenga repos privados.
 
 Además conviene probar con un **repo real grande** (cientos de ramas de despliegue y merges frecuentes): ahí fue donde aparecieron la escalera de carriles y las columnas desbordadas ([[Historial de Cambios]]).
 

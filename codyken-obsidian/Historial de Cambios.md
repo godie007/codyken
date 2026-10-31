@@ -10,6 +10,13 @@ up: "[[00 - Inicio]]"
 
 # 📝 Historial de Cambios
 
+## 2026-10-30 — Documentación y capturas
+
+### Cambios y arreglos
+- Se retomaron las 20 capturas con la interfaz actual y se añadieron `eliminar-ramas.png` y `mensaje-commit.png`.
+- El README y la bóveda recogen el eliminado masivo, el desplazamiento de mensajes, el formato del mensaje y el aviso único de ramas ocultas. El contador de tests pasa a 128.
+- Queda documentado como limitación que ocultar una rama abierta en otro worktree no la quita del gráfico.
+
 ## 2026-10-30 — Mensajes de commit legibles
 
 ### Nuevo

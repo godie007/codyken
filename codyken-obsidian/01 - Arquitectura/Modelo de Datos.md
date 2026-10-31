@@ -5,7 +5,7 @@ type: arquitectura
 tags:
   - arquitectura
   - tipos
-updated: 2026-10-20
+updated: 2026-10-30
 up: "[[01 - Arquitectura/Visión General]]"
 prev: "[[01 - Arquitectura/Procesos e IPC]]"
 next: "[[01 - Arquitectura/Seguridad]]"
@@ -30,7 +30,7 @@ Todo vive en `src/shared/types.ts`. Las fechas viajan en **milisegundos**.
 
 | Tipo | Campos |
 |---|---|
-| `Ref` | `type` (`local` / `remote` / `tag`), `name`, `fullName` (`refs/heads/x`), `hash` (en tags, el commit apuntado), y en locales `upstream`, `ahead`, `behind`, `gone`, `isHead`; en remotas `remote` |
+| `Ref` | `type` (`local` / `remote` / `tag`), `name`, `fullName` (`refs/heads/x`), `hash` (en tags, el commit apuntado), y en locales `upstream`, `ahead`, `behind`, `gone`, `isHead`; en remotas `remote` e `isDefault` (la principal del remoto, según `origin/HEAD`) |
 | `Remote` | `name`, `url`, `host` (`github.com`, o `local` si el remoto es una ruta) |
 | `StashEntry` | `index`, `hash`, `base` (commit sobre el que se guardó), `author`, `email`, `date`, `message` (ya limpio) |
 | `GraphFilter` | `hidden[]`, `solo[]` — nombres completos de refs ([[03 - Algoritmos/Filtro de Ramas]]) |

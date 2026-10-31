@@ -5,7 +5,7 @@ type: qa
 tags:
   - qa
   - capturas
-updated: 2026-10-20
+updated: 2026-10-30
 up: "[[00 - Inicio]]"
 prev: "[[06 - QA y Tests/Suite de Tests]]"
 next: "[[06 - QA y Tests/Verificación Visual]]"
@@ -58,7 +58,7 @@ const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
 set.call(input, 'pull'); input.dispatchEvent(new Event('input', { bubbles: true }))
 ```
 
-Las capturas del README y de esta bóveda (`Adjuntos/capturas/`) se tomaron así, reducidas a 1600 px con `sips -Z 1600`.
+Las capturas del README y de esta bóveda (`Adjuntos/capturas/`) se tomaron así, reducidas a 1600 px con `sips -Z 1600`, con los repos de la [[06 - QA y Tests/Verificación Visual|verificación visual]].
 
 ## Arrastrar y soltar desde el script
 

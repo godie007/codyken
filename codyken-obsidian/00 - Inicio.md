@@ -2,7 +2,7 @@
 title: Codyken — Inicio
 description: Punto de entrada (MOC) a la documentación de Codyken; un enlace por nota vigente
 type: moc
-updated: 2026-10-20
+updated: 2026-10-30
 tags:
   - moc
   - codyken

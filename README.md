@@ -13,7 +13,7 @@ Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales,
 ![React](https://img.shields.io/badge/React-19-2b2e3a?logo=react&logoColor=61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-2b2e3a?logo=typescript&logoColor=3178c6)
 ![Plataforma](https://img.shields.io/badge/plataforma-macOS-2b2e3a?logo=apple&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-106%20en%20verde-a6e22e)
+![Tests](https://img.shields.io/badge/tests-128%20en%20verde-a6e22e)
 
 [Características](#-características) · [Empezar](#-empezar) · [Atajos](#️-atajos) · [Arquitectura](#️-arquitectura) · [Documentación](#-documentación)
 
@@ -44,6 +44,8 @@ Funciona sobre el `git` de tu equipo: mismo comportamiento, mismas credenciales,
 - Los **stashes** aparecen como un commit más (cuadrado punteado) **justo encima del commit donde se guardaron**, también si su rama ya no existe. Al seleccionarlo: *Aplicar*, *Aplicar y eliminar (pop)* o *Eliminar*; doble clic lo aplica.
 - Búsqueda por mensaje, autor o SHA (⌘F), columnas configurables, carga por páginas de 2000 commits y lista virtualizada.
 - **⌘‑clic** en otro commit para compararlo con el seleccionado.
+- Los **mensajes largos** llegan hasta el borde de su columna y se desplazan a los lados con el trackpad, Mayús + rueda o la barra inferior.
+- El **detalle del commit** interpreta el mensaje: tipo y alcance como etiquetas (`fix`, `seguridad`), párrafos que aprovechan el ancho, títulos, viñetas, código y coautores aparte.
 
 ### Arrastrar y soltar ramas
 
@@ -128,16 +130,25 @@ Cada repo que abres, clonas o creas queda en una lista (hasta 50) para volver a 
 - El **ojo** junto a cada rama, carpeta o remoto la quita del gráfico; una rama local se oculta junto con su remota para que sus commits desaparezcan de verdad. También existe **Mostrar solo esta rama**.
 - En el panel izquierdo: ☁ si la rama está al día con su remota, `↑n` / `↓n` si difiere, `local` si nunca se subió y 💻 en las remotas que también tienes en local.
 - Una rama que está igual en local y en el remoto aparece **una sola vez** (en Local, con ☁); en Remoto solo quedan las que difieren o no tienes. Filtrando por su nombre aparece también la remota.
-- El filtro se guarda por repositorio y se avisa en la búsqueda, en el panel y en la barra de estado.
+- El filtro se guarda por repositorio y se avisa en un solo lugar: *n ramas ocultas · Mostrar todas*, junto a la búsqueda del gráfico.
+- **Eliminar varias ramas**: ⌘‑clic y Mayús‑clic las seleccionan en el panel (o clic derecho sobre una carpeta, un remoto o *Local*). Un diálogo muestra qué se elimina y qué no: nunca la rama actual, una abierta en otro worktree ni la principal del remoto. Las locales se recuperan con Deshacer.
 
 <table>
   <tr>
-    <td width="50%"><img src="codyken-obsidian/Adjuntos/capturas/ocultar-ramas.png" alt="feature/pagos oculta: sus commits ya no aparecen y el panel avisa 2 ramas ocultas" /></td>
+    <td width="50%"><img src="codyken-obsidian/Adjuntos/capturas/ocultar-ramas.png" alt="feature/pagos oculta: sus commits ya no aparecen y junto a la búsqueda se avisa de 2 ramas ocultas" /></td>
     <td width="50%"><img src="codyken-obsidian/Adjuntos/capturas/stash.png" alt="Stash seleccionado en el gráfico con su archivo y las acciones de aplicar o eliminar" /></td>
   </tr>
   <tr>
     <td align="center"><sub>Ramas ocultas con su remota</sub></td>
     <td align="center"><sub>Stash en el gráfico: aplicar, pop o eliminar</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="codyken-obsidian/Adjuntos/capturas/eliminar-ramas.png" alt="Tres ramas seleccionadas en el panel y diálogo que elimina dos y conserva la abierta en otro worktree" /></td>
+    <td width="50%"><img src="codyken-obsidian/Adjuntos/capturas/mensaje-commit.png" alt="Mensaje de un commit con etiquetas de tipo y alcance, títulos, viñetas y coautores" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Eliminar varias ramas a la vez</sub></td>
+    <td align="center"><sub>Mensaje de commit interpretado</sub></td>
   </tr>
 </table>
 

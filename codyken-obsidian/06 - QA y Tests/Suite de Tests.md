@@ -5,7 +5,7 @@ type: qa
 tags:
   - qa
   - tests
-updated: 2026-10-20
+updated: 2026-10-30
 up: "[[00 - Inicio]]"
 next: "[[06 - QA y Tests/Modo Captura]]"
 related:
@@ -15,7 +15,7 @@ related:
 # 🧪 Suite de Tests
 
 ```bash
-npm test          # vitest run — 106 tests en 11 archivos
+npm test          # vitest run — 128 tests en 15 archivos
 npm run typecheck # tsc de main/preload/lib/tests y del renderer
 ```
 
@@ -184,6 +184,36 @@ Los tests de git crean repos reales en una carpeta temporal y los borran al term
 
 > [!note] Lo que no cubren
 > `gh`, `glab` y `git-lfs` no se ejecutan en los tests (solo sus parsers). `gh` se probó a mano; `glab` y `git-lfs` no estaban instalados ([[Limitaciones Conocidas]]).
+
+## `tests/format.test.ts` — nombres largos
+
+| Test | Verifica |
+|---|---|
+| deja entero un nombre corto | `splitMiddle` sin recorte |
+| reserva el final con la extensión y no pierde caracteres | principio + final = nombre |
+| no parte un emoji por la mitad | corte por caracteres, no por unidades UTF‑16 |
+
+## `tests/bulkdelete.test.ts` — [[05 - Flujos de Trabajo/Ramas y Merge#Eliminar varias ramas|eliminar varias ramas]]
+
+| Test | Verifica |
+|---|---|
+| nunca incluye la rama actual, ni una abierta en otro worktree, ni la principal del remoto | `planBulkDelete` y sus motivos |
+| no toca la remota de la rama actual aunque no sea la principal | exclusión de la remota |
+| ofrece la remota de una local solo si no estaba ya elegida y no es la principal | casilla de remotas |
+| ignora las etiquetas | solo ramas |
+
+## `tests/commitmessage.test.ts` — [[04 - Interfaz/Panel Derecho#Mensaje de un commit|mensaje de un commit]]
+
+| Test | Verifica |
+|---|---|
+| separa tipo, alcance y título | Conventional Commits |
+| reúne las líneas que git ajustó y las viñetas partidas | párrafos y continuación de viñetas |
+| saca los coautores del cuerpo, pero no confunde `Docs:` ni `WEB-03:` con ellos | trailers |
+| no pierde ninguna palabra del mensaje | todo el texto sigue ahí |
+| deja el título tal cual si no es Conventional Commits | asunto libre |
+| respeta los saltos de línea cortos, los títulos de sección y el código | bloques |
+| un mensaje de una línea no tiene cuerpo | sin bloques |
+| reconoce una etiqueta, no una frase ni una URL | `splitLead` |
 
 ## Sin cobertura automática
 

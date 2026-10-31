@@ -6,7 +6,7 @@ tags:
   - algoritmo
   - ramas
   - grafico
-updated: 2026-10-20
+updated: 2026-10-30
 up: "[[00 - Inicio]]"
 prev: "[[03 - Algoritmos/Stashes en el Gráfico]]"
 next: "[[03 - Algoritmos/Diff y Staging Parcial]]"
@@ -48,3 +48,6 @@ HEAD siempre se dibuja aunque su rama esté oculta, para no perder el punto de t
 ## Dónde se ve
 
 Un solo aviso naranja, **"n ramas ocultas · Mostrar todas"**, junto a la búsqueda del gráfico, y el ojo tachado en cada fila oculta. El menú de una rama ofrece *Ocultar / Mostrar en el gráfico* y *Mostrar solo esta rama*; la paleta, *Mostrar todas las ramas*.
+
+> [!warning] Ramas abiertas en otro worktree
+> `git log --all` incluye el HEAD de los demás worktrees aunque su rama esté en `--exclude`. Por eso una rama abierta en otro worktree cuenta como oculta, pero sus commits y su etiqueta siguen en el gráfico ([[Limitaciones Conocidas]]).
