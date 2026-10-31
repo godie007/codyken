@@ -4,6 +4,7 @@ import { api, mod } from '../api'
 import { formatFullDate, ltr, relativeTime, shortHash, splitPath } from '../lib/format'
 import { buildTree, type TreeNode } from '../lib/refs'
 import { Icon } from './Icons'
+import { CommitBody, CommitTitle } from './CommitMessage'
 import { Avatar, FileName, StatusBadge } from './ui'
 
 /** Un extremo de una comparación: el SHA y cómo mostrarlo (nombre de rama o SHA corto) */
@@ -354,8 +355,6 @@ function CommitDetailPanel(props: CommitPanelProps & { hash: string; stash?: Sta
   if (error) return <aside className="right-panel"><div className="empty">{error}</div></aside>
   if (!detail) return <aside className="right-panel"><div className="empty">Cargando…</div></aside>
 
-  const [summary, ...rest] = detail.message.split('\n')
-  const body = rest.join('\n').trim()
   const parent = detail.parents[0] ?? null
   const isActive = (path: string): boolean => props.activeDiff?.kind === 'commit' && props.activeDiff.hash === detail.hash && props.activeDiff.path === path
 
@@ -378,26 +377,28 @@ function CommitDetailPanel(props: CommitPanelProps & { hash: string; stash?: Sta
       )}
       <div className="rp-scroll">
         <div className="commit-info">
-          <h2 className="commit-subject">{summary}</h2>
-          {body && <pre className="commit-body-text">{body}</pre>}
+          <CommitTitle message={detail.message} />
           <div className="commit-meta">
-            <Avatar name={detail.author} email={detail.email} size={30} />
-            <div>
-              <div className="commit-author">{detail.author} <span className="muted">&lt;{detail.email}&gt;</span></div>
-              <div className="muted small">{formatFullDate(detail.date)}</div>
+            <Avatar name={detail.author} email={detail.email} size={28} />
+            <div className="commit-meta-text">
+              <div className="commit-author truncate" title={`${detail.author} <${detail.email}>`}>{detail.author}</div>
+              <div className="muted small">
+                {formatFullDate(detail.date)}
+                {detail.parents.length > 0 && (
+                  <span className="commit-parents">
+                    {detail.parents.length > 1 ? 'Padres' : 'Padre'}
+                    {detail.parents.map((p) => (
+                      <button key={p} className="link mono" onClick={() => props.onSelectCommit(p)}>{shortHash(p)}</button>
+                    ))}
+                  </span>
+                )}
+              </div>
               {(detail.committer !== detail.author || detail.committerEmail !== detail.email) && (
                 <div className="muted small">Confirmado por {detail.committer} · {formatFullDate(detail.committerDate)}</div>
               )}
             </div>
           </div>
-          {detail.parents.length > 0 && (
-            <div className="commit-parents small">
-              <span className="muted">{detail.parents.length > 1 ? 'Padres:' : 'Padre:'}</span>
-              {detail.parents.map((p) => (
-                <button key={p} className="link mono" onClick={() => props.onSelectCommit(p)}>{shortHash(p)}</button>
-              ))}
-            </div>
-          )}
+          <CommitBody key={detail.hash} message={detail.message} />
         </div>
         <FileSection title="Archivos" count={detail.files.length} action={<ViewToggle view={props.fileView} onChange={props.onFileView} />}>
           <FileList

@@ -41,7 +41,7 @@ Usa su propia carpeta de ajustes (`$TMPDIR/codyken-snapshot`), así que **no toc
 (async () => {
   const w = (t) => new Promise((r) => setTimeout(r, t))
   const q = (sel, txt) => [...document.querySelectorAll(sel)].find((e) => e.textContent.includes(txt))
-  document.querySelector('.lp-filter-banner .link')?.click()   // limpiar filtro
+  document.querySelector('.filter-chip')?.click()   // limpiar filtro
   await w(1200)
   q('.graph-row', 'Ajusta el README').click()                  // seleccionar commit
   await w(900)

@@ -5,7 +5,7 @@ type: interfaz
 tags:
   - interfaz
   - commit
-updated: 2026-10-20
+updated: 2026-10-30
 up: "[[00 - Inicio]]"
 prev: "[[04 - Interfaz/Panel Izquierdo]]"
 next: "[[04 - Interfaz/Diff, Historial y Blame]]"
@@ -32,6 +32,15 @@ Componente: `src/renderer/src/components/CommitPanel.tsx`. Cambia según la sele
   - botón verde: *Hacer commit de n archivos* · *Modificar el último commit* · *Prepara cambios para hacer commit* (desactivado). ⌘Enter hace commit; ⇧⌘Enter prepara todo y hace commit.
 
 El borrador del mensaje se conserva por repositorio mientras la app esté abierta, y es el mismo que se edita en la fila `// WIP` del gráfico.
+
+## Mensaje de un commit
+
+`lib/commitmessage.ts` interpreta el mensaje sin perder texto y `CommitMessage.tsx` lo muestra:
+
+- **Título:** el tipo de Conventional Commits (`fix`, `feat`…) y su alcance salen como etiquetas de color; si el asunto no sigue esa forma, se muestra tal cual.
+- **Cuerpo:** reúne las líneas que git ajustó a ~72 columnas para aprovechar el ancho; un salto tras una línea de menos de 50 caracteres se respeta. Interpreta viñetas, listas numeradas, títulos (`Cambios:`), etiquetas iniciales en negrita (`MOB-04:`), `código` y bloques de código.
+- **Coautores y firmas:** el último grupo de líneas tipo `Co-Authored-By:` sale aparte, con avatar y sin el correo, que queda en el *tooltip*.
+- **Mensajes largos:** a partir de 700 caracteres el cuerpo se pliega con *Ver todo el mensaje*, para que los archivos sigan a mano.
 
 ![[cambios.png]]
 

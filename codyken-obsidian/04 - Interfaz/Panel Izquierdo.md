@@ -44,7 +44,7 @@ Componente: `src/renderer/src/components/LeftPanel.tsx`. Arriba, un filtro de te
 | 💻 | Remoto | También la tienes en local |
 | 👁 / 👁 tachado | Al pasar el ratón | Ocultar / mostrar en el gráfico (rama, carpeta o remoto entero) |
 
-Las filas ocultas se ven atenuadas y tachadas, y arriba aparece "n ramas ocultas · **Mostrar todas**".
+Las filas ocultas se ven atenuadas y tachadas. Para recuperarlas, el aviso *n ramas ocultas · Mostrar todas* está junto a la búsqueda del gráfico ([[04 - Interfaz/Gráfico de Commits]]).
 
 ## Interacción
 
@@ -55,7 +55,7 @@ Las filas ocultas se ven atenuadas y tachadas, y arriba aparece "n ramas ocultas
 
 ## Menú de una rama
 
-Checkout (en remotas *crea la rama local*; en etiquetas *HEAD desacoplado*) · Merge de X en la actual · Rebase de la actual sobre X · Push / Pull (si es la actual) · Crear rama aquí… · Crear etiqueta aquí… · Abrir en un worktree nuevo… · Comparar con {actual} · Crear pull request… (si hay GitHub/GitLab) · Ocultar/Mostrar en el gráfico · Mostrar solo esta rama en el gráfico · Mostrar todas las ramas (si hay filtro) · Renombrar… · Eliminar… (local) · Eliminar rama remota… · Eliminar etiqueta… · Copiar nombre.
+Checkout (en remotas *crea la rama local*; en etiquetas *HEAD desacoplado*) · Merge de X en la actual · Rebase de la actual sobre X · Push / Pull (si es la actual) · Crear rama aquí… · Crear etiqueta aquí… · Abrir en un worktree nuevo… · Comparar con {actual} · Crear pull request… (si hay GitHub/GitLab) · Ocultar/Mostrar en el gráfico · Mostrar solo esta rama en el gráfico · Renombrar… · Eliminar… (local) · Eliminar rama remota… · Eliminar etiqueta… · Copiar nombre.
 
 ## Pull requests
 

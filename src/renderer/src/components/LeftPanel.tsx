@@ -24,7 +24,6 @@ export interface LeftPanelProps {
   onDeleteBranches: (refs: Ref[]) => void
   onHoverRef: (ref: Ref | null) => void
   onToggleHidden: (refs: Ref[]) => void
-  onClearFilter: () => void
   onSelectStash: (stash: StashEntry) => void
   onStashMenu: (stash: StashEntry) => void
   onOpenSubmodule: (path: string) => void
@@ -198,7 +197,6 @@ export function LeftPanel(props: LeftPanelProps) {
   const hidden = new Set(props.filter.hidden)
   const solo = new Set(props.filter.solo)
   const isHidden = (ref: Ref): boolean => (solo.size ? !solo.has(ref.fullName) && !ref.isHead : hidden.has(ref.fullName))
-  const filtered = hidden.size > 0 || solo.size > 0
 
   const section = (id: SectionId, title: string, count: number, icon: ReactNode, children: ReactNode, extra?: ReactNode, onMenu?: () => void): ReactNode => (
     <div className="lp-section">
@@ -252,13 +250,6 @@ export function LeftPanel(props: LeftPanelProps) {
           onKeyDown={(e) => e.key === 'Escape' && setFilter('')}
         />
       </div>
-      {filtered && (
-        <div className="lp-filter-banner">
-          <Icon.EyeOff size={13} />
-          <span>{solo.size ? `Mostrando solo ${solo.size} ${solo.size === 1 ? 'rama' : 'ramas'}` : `${hidden.size} ${hidden.size === 1 ? 'rama oculta' : 'ramas ocultas'}`}</span>
-          <button className="link" onClick={props.onClearFilter}>Mostrar todas</button>
-        </div>
-      )}
       {selectedRefs.length > 0 && (
         <div className="lp-filter-banner lp-selection-banner">
           <span>{selectedRefs.length} {selectedRefs.length === 1 ? 'seleccionada' : 'seleccionadas'}</span>

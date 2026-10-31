@@ -10,6 +10,16 @@ up: "[[00 - Inicio]]"
 
 # 📝 Historial de Cambios
 
+## 2026-10-30 — Mensajes de commit legibles
+
+### Nuevo
+- Los mensajes del gráfico se desplazan a los lados con el trackpad, Mayús + rueda o una barra bajo la columna.
+- El detalle del commit interpreta el mensaje: etiquetas de tipo y alcance, párrafos reunidos, viñetas, código y coautores aparte. Los mensajes largos se pliegan con *Ver todo el mensaje*.
+
+### Cambios y arreglos
+- El texto del gráfico se cortaba antes de la división: cada fila reservaba 34 px para el botón de columnas de la cabecera.
+- *Mostrar ramas ocultas* salía en el panel izquierdo, la búsqueda, la barra de estado y el menú de cada rama. Queda un solo aviso, junto a la búsqueda del gráfico, además de la paleta.
+
 ## 2026-10-30 — Eliminar varias ramas
 
 ### Nuevo

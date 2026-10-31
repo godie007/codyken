@@ -68,4 +68,6 @@ Checkout de este commit · Crear rama aquí… · Crear etiqueta aquí… · Com
 
 ## Búsqueda
 
-⌘F enfoca la barra de búsqueda: filtra por mensaje, autor, correo o prefijo de SHA, atenúa lo que no coincide y muestra el número de resultados. Enter salta al siguiente (Mayús+Enter al anterior), Esc limpia. Si hay ramas ocultas aparece el chip **Ramas filtradas ✕**.
+⌘F enfoca la barra de búsqueda: filtra por mensaje, autor, correo o prefijo de SHA, atenúa lo que no coincide y muestra el número de resultados. Enter salta al siguiente (Mayús+Enter al anterior), Esc limpia. Si hay ramas ocultas aparece el aviso **n ramas ocultas · Mostrar todas**, el único de la app.
+
+Los mensajes llegan hasta el borde de su columna, sin puntos suspensivos, y se desplazan a los lados todos a la vez: con el trackpad, Mayús + rueda o la barra bajo la columna. Esa barra recorre el mensaje más largo de los que se ven, para que un asunto enorme más abajo no la desproporcione.

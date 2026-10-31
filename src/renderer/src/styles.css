@@ -805,7 +805,8 @@ pre {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   flex: none;
-  padding-right: 34px;
+  /* Lo que ocupa la barra vertical de las filas: así las columnas coinciden */
+  padding-right: 10px;
 }
 .graph-header-cell {
   position: relative;
@@ -862,6 +863,18 @@ pre {
   overflow-x: hidden;
   overflow-y: auto;
   outline: none;
+  scrollbar-gutter: stable;
+}
+.graph-footer {
+  display: grid;
+  flex: none;
+  height: 10px;
+  padding-right: 10px;
+}
+.message-bar {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .graph-row {
   position: absolute;
@@ -869,7 +882,6 @@ pre {
   right: 0;
   display: grid;
   align-items: center;
-  padding-right: 34px;
   cursor: default;
 }
 .graph-row:hover {
@@ -898,6 +910,14 @@ pre {
 }
 .col-message {
   color: var(--text);
+  text-overflow: clip;
+}
+.graph-row:not(.wip) .col-message {
+  mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+}
+.message-text {
+  display: inline-block;
+  transform: translateX(var(--message-scroll, 0));
 }
 .col-graph {
   padding: 0;
@@ -1298,32 +1318,151 @@ pre {
   border-bottom: 1px solid var(--border);
 }
 .commit-subject {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 15px;
   line-height: 1.35;
   user-select: text;
 }
-.commit-body-text {
-  font: 12.5px/1.5 var(--font);
-  white-space: pre-wrap;
+.cm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+.cm-type,
+.cm-scope,
+.cm-breaking {
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+.cm-type {
+  --cm: var(--text-muted);
+  background: color-mix(in srgb, var(--cm) 18%, transparent);
+  color: var(--cm);
+}
+.cm-type-feat {
+  --cm: var(--ok);
+}
+.cm-type-fix,
+.cm-type-hotfix {
+  --cm: var(--danger);
+}
+.cm-type-docs {
+  --cm: var(--accent);
+}
+.cm-type-refactor,
+.cm-type-perf {
+  --cm: var(--mk-purple);
+}
+.cm-type-test,
+.cm-type-ci,
+.cm-type-build {
+  --cm: var(--warn);
+}
+.cm-scope {
+  background: var(--bg-active);
   color: var(--text-muted);
-  margin-bottom: 12px;
+  font-weight: 500;
+}
+.cm-breaking {
+  background: var(--danger);
+  color: var(--mk-bg);
+}
+.cm-body {
+  margin-top: 12px;
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.5;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+.cm-body p,
+.cm-body ul,
+.cm-body ol,
+.cm-code {
+  margin: 0 0 8px;
+}
+.cm-body > :last-child {
+  margin-bottom: 0;
+}
+.cm-body ul,
+.cm-body ol {
+  padding-left: 16px;
+}
+.cm-body li + li {
+  margin-top: 4px;
+}
+.cm-body code,
+.cm-code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  border-radius: 3px;
+  background: var(--bg-active);
+}
+.cm-body code {
+  padding: 0 3px;
+}
+.cm-code {
+  padding: 6px 8px;
+  overflow-x: auto;
+}
+.cm-lead {
+  font-weight: 600;
+}
+.cm-heading {
+  margin: 12px 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.cm-heading:first-child {
+  margin-top: 0;
+}
+.cm-collapsed {
+  max-height: 210px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+}
+.cm-more {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.cm-trailers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.cm-trailer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .commit-meta {
   display: flex;
-  gap: 10px;
+  gap: 9px;
   align-items: center;
   margin-top: 10px;
+}
+.commit-meta-text {
+  flex: 1;
+  min-width: 0;
 }
 .commit-author {
   font-weight: 500;
   user-select: text;
 }
 .commit-parents {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+  margin-left: 8px;
 }
 
 /* ── Diff ────────────────────────────────────────────────────────────────── */
@@ -2354,13 +2493,6 @@ mark.hl-del {
 
 /* ── Barra de estado ────────────────────────────────────────────────────── */
 
-.sb-link {
-  font: inherit;
-  cursor: pointer;
-}
-.sb-link:hover {
-  text-decoration: underline;
-}
 
 /* ── Resaltado de sintaxis (Monokai) ────────────────────────────────────── */
 

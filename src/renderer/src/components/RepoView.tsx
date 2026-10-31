@@ -1086,7 +1086,6 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
       { type: 'separator' },
       { id: 'hide', label: isRefHidden(ref) ? 'Mostrar en el gráfico' : 'Ocultar en el gráfico', enabled: !isCurrent },
       { id: 'solo', label: 'Mostrar solo esta rama en el gráfico' },
-      ...(filterActive ? [{ id: 'show-all', label: 'Mostrar todas las ramas' }] : []),
       { type: 'separator' },
       ...(ref.type === 'local' ? [{ id: 'rename', label: 'Renombrar…' }, { id: 'delete', label: 'Eliminar…', enabled: !isCurrent }] : []),
       ...(remote ? [{ id: 'delete-remote', label: ref.type === 'remote' ? 'Eliminar rama remota…' : `Eliminar ${remote.name} del remoto…` }] : []),
@@ -1107,7 +1106,6 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
     else if (id === 'pr') void createPr(ref.name, ref.upstream)
     else if (id === 'hide') toggleHidden([ref])
     else if (id === 'solo') setFilter({ hidden: [], solo: withUpstream(ref) })
-    else if (id === 'show-all') setFilter(NO_FILTER)
     else if (id === 'rename') void renameBranch(ref)
     else if (id === 'delete') void deleteLocalBranch(ref)
     else if (id === 'delete-remote' && remote) {
@@ -1513,7 +1511,6 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
                 onDeleteBranches={(list) => setBulkDelete(planBulkDelete(list, refs, data.worktrees))}
                 onHoverRef={(ref) => setHighlight(ref?.hash ?? null)}
                 onToggleHidden={toggleHidden}
-                onClearFilter={() => setFilter(NO_FILTER)}
                 onSelectStash={(entry) => {
                   setSelection({ kind: 'stash', index: entry.index, hash: entry.hash })
                   setScrollTarget({ hash: entry.hash, nonce: Date.now() })
@@ -1622,7 +1619,7 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
               compareBase={compareBase}
               highlight={highlight}
               wipSummary={draft.summary}
-              filterActive={filterActive}
+              filterLabel={filter.solo.length ? `Solo ${filter.solo.length} ${filter.solo.length === 1 ? 'rama' : 'ramas'}` : filter.hidden.length ? `${filter.hidden.length} ${filter.hidden.length === 1 ? 'rama oculta' : 'ramas ocultas'}` : null}
               onWipSummary={(summary) => setDraft({ ...draft, summary })}
               onClearFilter={() => setFilter(NO_FILTER)}
               columns={settings.columns}
@@ -1679,11 +1676,6 @@ export function RepoView({ repo, settings, onSettings, onOpenRepo, onNewTab, ope
         )}
         {state?.detached && <span className="sb-item warn">HEAD desacoplado en {shortHash(state.head!)}</span>}
         {state?.operation && <span className="sb-item warn"><Icon.Warning size={12} /> {state.operation} en curso</span>}
-        {filterActive && (
-          <button className="sb-item sb-link warn" onClick={() => setFilter(NO_FILTER)} title="Mostrar todas las ramas">
-            <Icon.EyeOff size={12} /> {filter.solo.length ? 'Gráfico filtrado' : `${filter.hidden.length} ${filter.hidden.length === 1 ? 'rama oculta' : 'ramas ocultas'}`}
-          </button>
-        )}
         <span className="spacer" />
         {lastFetch && <span className="sb-item muted">Último fetch {relativeTime(lastFetch)}</span>}
         <span className="sb-item muted">{commits.length.toLocaleString('es')} {commits.length === 1 ? 'commit' : 'commits'}</span>

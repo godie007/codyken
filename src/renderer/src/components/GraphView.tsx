@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type WheelEvent } from 'react'
 import type { ColumnId, Commit, WorkingStatus } from '../../../shared/types'
 import { api, mod } from '../api'
 import { formatFullDate, initials, relativeTime, shortHash } from '../lib/format'
@@ -48,7 +48,8 @@ export interface GraphViewProps {
   scrollTarget: { hash: string; nonce: number } | null
   searchFocus: number
   wipSummary: string
-  filterActive: boolean
+  /** Resumen de las ramas ocultas; `null` si se ven todas */
+  filterLabel: string | null
   onWipSummary: (summary: string) => void
   onColumnsChange: (columns: ColumnId[]) => void
   onColumnWidths: (widths: Partial<Record<ColumnId, number>>) => void
@@ -66,7 +67,9 @@ export interface GraphViewProps {
 
 export function GraphView(props: GraphViewProps) {
   const { commits, graph, hasWip, columns, selected } = props
+  const root = useRef<HTMLDivElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
+  const messageBar = useRef<HTMLDivElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [height, setHeight] = useState(600)
@@ -87,6 +90,14 @@ export function GraphView(props: GraphViewProps) {
   const resetColumn = (c: ColumnId): void => {
     const { [c]: _, ...rest } = props.columnWidths
     props.onColumnWidths(rest)
+  }
+
+  // Por variable CSS y no por estado: desplazar no vuelve a pintar las filas
+  const onMessageScroll = (): void => root.current?.style.setProperty('--message-scroll', `${-(messageBar.current?.scrollLeft ?? 0)}px`)
+  const onWheel = (e: WheelEvent<HTMLDivElement>): void => {
+    if (!messageBar.current) return
+    const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX
+    if (Math.abs(dx) > Math.abs(e.shiftKey ? 0 : e.deltaY)) messageBar.current.scrollLeft += dx
   }
 
   const matches = useMemo(() => {
@@ -159,6 +170,16 @@ export function GraphView(props: GraphViewProps) {
     props.onColumnsChange(columns.includes(column) ? columns.filter((c) => c !== column) : [...columns, column])
   }
 
+  // La barra de la columna recorre el mensaje más largo de los que se ven: uno enorme más abajo no la desproporciona
+  const firstVisible = Math.max(0, Math.floor(scrollTop / ROW_H) - offset)
+  const lastVisible = Math.ceil((scrollTop + height) / ROW_H) - offset
+  const messageWidth = useMemo(() => {
+    const context = document.createElement('canvas').getContext('2d')
+    if (!context) return 0
+    context.font = getComputedStyle(document.body).font
+    return commits.slice(firstVisible, lastVisible).reduce((max, c) => Math.max(max, context.measureText(c.subject).width + (c.stash !== undefined ? 20 : 0)), 0) + 24
+  }, [commits, firstVisible, lastVisible])
+
   const start = Math.max(0, Math.floor(scrollTop / ROW_H) - 10)
   const end = Math.min(total, Math.ceil((scrollTop + height) / ROW_H) + 10)
   const rows = []
@@ -186,7 +207,7 @@ export function GraphView(props: GraphViewProps) {
   }
 
   return (
-    <div className="graph">
+    <div className="graph" ref={root}>
       <div className="graph-search">
         <Icon.Search size={14} />
         <input
@@ -205,9 +226,9 @@ export function GraphView(props: GraphViewProps) {
           }}
         />
         {matches && <span className="graph-search-count">{matches.size} {matches.size === 1 ? 'resultado' : 'resultados'} · Enter para saltar</span>}
-        {props.filterActive && (
-          <button className="filter-chip" onClick={props.onClearFilter} title="Mostrar todas las ramas">
-            <Icon.EyeOff size={12} /> Ramas filtradas <Icon.Close size={11} />
+        {props.filterLabel && (
+          <button className="filter-chip" onClick={props.onClearFilter} title="Mostrar todas las ramas en el gráfico">
+            <Icon.EyeOff size={12} /> {props.filterLabel} · Mostrar todas
           </button>
         )}
       </div>
@@ -230,9 +251,20 @@ export function GraphView(props: GraphViewProps) {
           <Icon.ChevronDown size={14} />
         </button>
       </div>
-      <div className="graph-scroller" ref={scroller} onScroll={onScroll} tabIndex={-1}>
+      <div className="graph-scroller" ref={scroller} onScroll={onScroll} onWheel={onWheel} tabIndex={-1}>
         <div style={{ height: total * ROW_H, position: 'relative' }}>{rows}</div>
         {total === 0 && <div className="empty">Este repositorio todavía no tiene commits.</div>}
+      </div>
+      <div className="graph-footer" style={{ gridTemplateColumns: template }}>
+        {visible.map((c) =>
+          c === 'message' ? (
+            <div key={c} className="message-bar" ref={messageBar} onScroll={onMessageScroll} title="Desplaza los mensajes a los lados; también con el trackpad o Mayús + rueda">
+              <div style={{ width: messageWidth, height: 1 }} />
+            </div>
+          ) : (
+            <div key={c} />
+          )
+        )}
       </div>
     </div>
   )
@@ -315,9 +347,9 @@ function GraphRowView({ index, commit, row, visible, template, graphWidth, selec
                 {isWip ? (
                   <WipCell status={props.status} summary={props.wipSummary} onSummary={props.onWipSummary} onFocus={() => props.onSelect(WIP_HASH)} />
                 ) : commit!.stash !== undefined ? (
-                  <span className="stash-subject"><Icon.Stash size={13} /> {commit!.subject}</span>
+                  <span className="stash-subject message-text"><Icon.Stash size={13} /> {commit!.subject}</span>
                 ) : (
-                  commit!.subject
+                  <span className="message-text">{commit!.subject}</span>
                 )}
               </div>
             )

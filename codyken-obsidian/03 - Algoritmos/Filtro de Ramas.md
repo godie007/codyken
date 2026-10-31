@@ -47,4 +47,4 @@ HEAD siempre se dibuja aunque su rama esté oculta, para no perder el punto de t
 
 ## Dónde se ve
 
-Chip naranja **"Ramas filtradas ✕"** en la búsqueda del gráfico, aviso "n ramas ocultas · Mostrar todas" en el panel izquierdo, ojo tachado en cada fila oculta y aviso en la barra de estado. El menú de una rama ofrece *Ocultar / Mostrar en el gráfico*, *Mostrar solo esta rama* y *Mostrar todas las ramas*.
+Un solo aviso naranja, **"n ramas ocultas · Mostrar todas"**, junto a la búsqueda del gráfico, y el ojo tachado en cada fila oculta. El menú de una rama ofrece *Ocultar / Mostrar en el gráfico* y *Mostrar solo esta rama*; la paleta, *Mostrar todas las ramas*.

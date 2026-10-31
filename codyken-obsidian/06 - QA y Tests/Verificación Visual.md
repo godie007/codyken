@@ -30,7 +30,7 @@ Además conviene probar con un **repo real grande** (cientos de ramas de desplie
 - [ ] El gráfico abre con la rama actual en la primera columna y sin desbordar el panel derecho.
 - [ ] Una rama igual en local y en sus remotos es una sola píldora (💻 ☁); las solo remotas salen sin `origin/`, con ☁; una rama desfasada muestra `↑n`/`↓n` en sus dos píldoras.
 - [ ] El stash aparece colgado de su base y al seleccionarlo lista sus archivos (también los nuevos).
-- [ ] 👁 sobre una rama la oculta junto con su remota; el contador de commits baja; *Mostrar todas* la recupera.
+- [ ] 👁 sobre una rama la oculta junto con su remota; el contador de commits baja; el único aviso, *n ramas ocultas · Mostrar todas* junto a la búsqueda del gráfico, la recupera.
 - [ ] Panel izquierdo: ☁ en ramas al día, `local` solo en las que nunca se subieron, 💻 en remotas que tienes en local.
 - [ ] Preparar 2 líneas de un diff deja exactamente esas líneas en el índice (`git diff --cached`).
 - [ ] Commit → Deshacer → los cambios vuelven a preparados y el mensaje a la caja.
@@ -46,5 +46,6 @@ Además conviene probar con un **repo real grande** (cientos de ramas de desplie
 - [ ] Con GitHub y `gh` con sesión, la sección *Pull requests* lista los abiertos; sin `gh`, explica cómo instalarlo.
 - [ ] *Nuevo worktree…* crea la carpeta y la abre en otra pestaña; *Eliminar worktree…* la quita.
 - [ ] ⌘‑clic y Mayús‑clic seleccionan varias ramas; *Eliminar…* muestra qué se borra y qué no (rama actual, otro worktree, principal del remoto, remota de la actual); las locales vuelven con Deshacer.
+- [ ] Los mensajes del gráfico llegan hasta el borde de su columna y se desplazan a los lados con el trackpad, Mayús + rueda o la barra inferior; un commit `fix(x):` con cuerpo se lee con etiquetas, párrafos, viñetas y coautores.
 - [ ] Un repo con patrones LFS y sin git-lfs muestra el aviso de instalación.
 - [ ] Con nombres de más de 80 caracteres, a 1000 y 1440 px: diff, editor, blame e historial mantienen todos sus botones dentro del panel, y el nombre conserva su principio y su extensión.
